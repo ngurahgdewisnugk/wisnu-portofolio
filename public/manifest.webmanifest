@@ -1,0 +1,14 @@
+{
+  "name": "Ngurah Gede Wisnu | Cloud Automation & Release Engineer",
+  "short_name": "Wisnu",
+  "description": "Portfolio of a cloud automation and release engineer.",
+  "lang": "en",
+  "theme_color": "#7a90ff",
+  "background_color": "#090a1a",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
