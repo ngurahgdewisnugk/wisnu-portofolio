@@ -11,11 +11,11 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 interface GithubContributionsChartProps {
-  username?: string;
+  username: string;
 }
 
 const GithubContributionsChart = ({
-  username = "adamsnows",
+  username,
 }: GithubContributionsChartProps) => {
   const [contributions, setContributions] = useState<Record<
     string,

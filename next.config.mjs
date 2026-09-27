@@ -1,92 +1,56 @@
+import { readFileSync } from "node:fs";
+
+const pkg = JSON.parse(
+  readFileSync(new URL("./package.json", import.meta.url), "utf8")
+);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
   poweredByHeader: false,
-  experimental: {
-    optimizeCss: false,
-    esmExternals: "loose",
+
+  // Self-contained server bundle for a small Docker runtime image.
+  output: "standalone",
+
+  // Build metadata is inlined at build time so the server-rendered HTML and
+  // the browser bundle always agree. The Dockerfile passes GIT_SHA/BUILD_TIME
+  // as build args; local builds fall back to "dev".
+  env: {
+    APP_VERSION: pkg.version,
+    GIT_SHA: process.env.GIT_SHA ?? "dev",
+    BUILD_TIME: process.env.BUILD_TIME ?? "",
   },
+
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "site.maestrialaw.com.br",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "dev.to",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "res.cloudinary.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "media.dev.to",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "opengraph.githubassets.com",
-        port: "",
-        pathname: "/**",
-      },
-      {
-        protocol: "https",
-        hostname: "repository-images.githubusercontent.com",
-        port: "",
-        pathname: "/**",
-      },
-    ],
-    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
-    imageSizes: [16, 32, 48, 64, 96, 128, 256, 300, 384],
-    formats: ["image/webp"],
-    minimumCacheTTL: 60,
-    disableStaticImages: false,
-    dangerouslyAllowSVG: true,
-    contentDispositionType: "attachment",
+    // Images are served as-is; the Image Optimization API stays disabled,
+    // which also removes its attack surface on a self-hosted server.
     unoptimized: true,
+    remotePatterns: [
+      { protocol: "https", hostname: "opengraph.githubassets.com", pathname: "/**" },
+      { protocol: "https", hostname: "repository-images.githubusercontent.com", pathname: "/**" },
+    ],
   },
-  async headers() {
+
+  // Short, conventional ops endpoints backed by API routes.
+  async rewrites() {
     return [
+      { source: "/health", destination: "/api/health" },
+      { source: "/version", destination: "/api/version" },
+    ];
+  },
+
+  async headers() {
+    const securityHeaders = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+    ];
+    return [
+      { source: "/:path*", headers: securityHeaders },
       {
-        source: "/:path*",
-        headers: [
-          {
-            key: "X-Robots-Tag",
-            value: "index, follow",
-          },
-        ],
-      },
-      // Headers específicos para WakaTime - nunca cachear
-      {
-        source: "/api/wakatime/:path*",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0",
-          },
-          {
-            key: "Pragma",
-            value: "no-cache",
-          },
-          {
-            key: "Expires",
-            value: "0",
-          },
-          {
-            key: "Vary",
-            value: "*",
-          },
-        ],
+        source: "/api/:path(health|version|metrics)",
+        headers: [{ key: "Cache-Control", value: "no-store" }],
       },
     ];
   },
