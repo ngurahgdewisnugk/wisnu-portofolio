@@ -23,18 +23,12 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/Other/UI/tabs";
+import { profile } from "@/data/profile";
+import { workData as pinnedWork } from "@/data/work";
+import { ProjectCardInterface } from "@/interfaces/ProjectInterface";
 
-// Example project data
-export const workData: {
-  image: string;
-  category: string;
-  name: string;
-  description: string;
-  link: string;
-  github: string;
-  language?: "javascript" | "typescript" | "python" | "shopify";
-  tags?: string[];
-}[] = [];
+// Pinned projects shown even when the GitHub API is unreachable.
+const workData: ProjectCardInterface["project"][] = pinnedWork;
 
 interface GitHubProject {
   github: string;
@@ -53,8 +47,8 @@ if (typeof window !== "undefined") {
 const Projects = () => {
   const [projectsData, setProjectsData] = useState(workData);
   const [categories, setCategories] = useState<string[]>([]);
-  const [category, setCategory] = useState("Todos");
-  const [activeTab, setActiveTab] = useState("Todos");
+  const [category, setCategory] = useState("All");
+  const [activeTab, setActiveTab] = useState("All");
   const [isChanging, setIsChanging] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null); // Inicializa como null
@@ -79,7 +73,7 @@ const Projects = () => {
 
   // Calcular o número total de projetos na categoria atual
   const totalProjectsInCategory = projectsData.filter((project) =>
-    category === "Todos" ? true : project.category === category
+    category === "All" ? true : project.category === category
   ).length;
 
   // Efeito para carregar mais projetos quando o elemento de carregamento ficar visível
@@ -118,10 +112,8 @@ const Projects = () => {
     try {
       setIsLoading(true);
 
-      // Usar o nome de usuário GitHub das variáveis de ambiente ou valor padrão
-      const username = process.env.NEXT_PUBLIC_GITHUB_USERNAME || "adamsnows";
-      const portfolioTag =
-        process.env.NEXT_PUBLIC_PORTFOLIO_TAG || "portfolio-project";
+      const username = profile.githubUsername;
+      const portfolioTag = profile.portfolioTopic;
 
       // Adicionar timestamp para evitar cache
       const timestamp = new Date().getTime();
@@ -179,7 +171,7 @@ const Projects = () => {
 
       // Atualizar categorias com base nos projetos combinados
       const uniqueCategories = [
-        "Todos",
+        "All",
         ...Array.from(new Set(combined.map((item) => item.category))),
       ];
       setCategories(uniqueCategories);
@@ -188,7 +180,7 @@ const Projects = () => {
       // Fallback para os projetos existentes
       setProjectsData(workData);
       const uniqueCategories = [
-        "Todos",
+        "All",
         ...Array.from(new Set(workData.map((item) => item.category))),
       ];
       setCategories(uniqueCategories);
@@ -222,7 +214,7 @@ const Projects = () => {
   // Filtrar projetos com base na categoria selecionada e ordenar por prioridade de linguagem
   const filteredProjects = projectsData
     .filter((project) => {
-      return category === "Todos" ? project : project.category === category;
+      return category === "All" ? project : project.category === category;
     })
     .sort((a, b) => {
       // Sort by language priority (shopify > typescript > javascript > python)
@@ -330,7 +322,7 @@ const Projects = () => {
 
       // Verificar se há mais projetos para carregar na nova categoria
       const projectsInCategory = projectsData.filter((project) =>
-        newCategory === "Todos" ? true : project.category === newCategory
+        newCategory === "All" ? true : project.category === newCategory
       );
       setHasMoreProjects(projectsInCategory.length > 9);
 
@@ -388,7 +380,7 @@ const Projects = () => {
             MY PROJECTS
           </h2>
           <AdvancedTextAnimation
-            text="A bit of my journey as a developer. Many projects are no longer on the old site, or don't have source code access as they are private projects. Thank you for visiting, come back anytime and feel free to leave feedback in the project repository!"
+            text="Everything I build in public lands here automatically: any of my GitHub repositories tagged with the portfolio-project topic shows up on this page, no redeploy needed."
             animationStyle="fade"
             speed={0.02}
             once={true}
@@ -486,7 +478,7 @@ const Projects = () => {
                       }
                       className="text-lg"
                     >
-                      {categoryName === "Todos" && <RiLayoutGridLine />}
+                      {categoryName === "All" && <RiLayoutGridLine />}
                       {categoryName === "Full stack" && <RiStackLine />}
                       {categoryName === "Front end" && <RiCodeSSlashLine />}
                       {categoryName === "Back end" && <RiDatabase2Line />}
@@ -510,6 +502,10 @@ const Projects = () => {
                 <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]"></div>
                 <p className="mt-4 text-white/70">Loading projects...</p>
               </div>
+            ) : filteredProjects.length === 0 ? (
+              <div className="col-span-3 py-10 text-center text-white/60">
+                No projects in this category yet.
+              </div>
             ) : (
               <AnimatePresence mode="wait">
                 {filteredProjects.map((project, index) => {
@@ -526,15 +522,6 @@ const Projects = () => {
                       inferredProject.language = "shopify";
                   }
 
-                  // Ensure language is a valid type or undefined
-                  if (
-                    inferredProject.language &&
-                    !["typescript", "javascript", "python", "shopify"].includes(
-                      inferredProject.language
-                    )
-                  ) {
-                    inferredProject.language = undefined;
-                  }
 
                   return (
                     <TabsContent

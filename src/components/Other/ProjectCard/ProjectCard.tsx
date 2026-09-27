@@ -3,9 +3,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { RiCodeFill, RiExternalLinkFill, RiGithubFill } from "react-icons/ri";
 import {
+  SiDocker,
+  SiGnubash,
+  SiGo,
   SiJavascript,
   SiPython,
-  SiShopify,
+  SiTerraform,
   SiTypescript,
 } from "react-icons/si";
 
@@ -23,7 +26,10 @@ const languageIcons: Record<
   javascript: { icon: SiJavascript, color: "#F7DF1E" },
   typescript: { icon: SiTypescript, color: "#3178C6" },
   python: { icon: SiPython, color: "#3776AB" },
-  shopify: { icon: SiShopify, color: "#95BF47" },
+  shell: { icon: SiGnubash, color: "#4EAA25" },
+  hcl: { icon: SiTerraform, color: "#7B42BC" },
+  dockerfile: { icon: SiDocker, color: "#2496ED" },
+  go: { icon: SiGo, color: "#00ADD8" },
 };
 
 const ProjectCard = ({ project, specialStyle, id }: ProjectCardInterface) => {
@@ -57,7 +63,7 @@ const ProjectCard = ({ project, specialStyle, id }: ProjectCardInterface) => {
           <div
             className={`relative w-full h-72 flex items-center justify-center ${
               specialStyle ? "bg-secondary/40" : "bg-slate-900"
-            } bg-work_project_bg xl:bg-no-repeat overflow-hidden xl:bg-contain`}
+            } overflow-hidden`}
           >
             <motion.div
               className="absolute inset-0 bg-gradient-to-br from-primary/50 to-secondary/50 z-10 overflow-hidden"

@@ -104,11 +104,6 @@ const config: Config = {
         typing: "typing 3.5s steps(40, end)",
         "blink-caret": "blink-caret .75s step-end infinite",
       },
-      backgroundImage: {
-        work_project_bg: "url(/project-bg.webp)",
-        contact_illustration: "url(/project-bg-2.webp)",
-        hero_shape: "url(/developer-1.webp)",
-      },
       backgroundSize: {
         "300%": "300% 100%",
       },

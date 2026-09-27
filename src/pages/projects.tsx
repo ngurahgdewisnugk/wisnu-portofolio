@@ -1,13 +1,14 @@
 import SmoothScrollSection from "@/components/Animations/SmoothScrollSection";
 import Seo from "@/components/Other/Seo";
+import { profile } from "@/data/profile";
 import Projects from "@/components/Templates/Projects/Projects";
 
 const ProjectsPage = () => {
   return (
     <>
       <Seo
-        description="Explore uma galeria de projetos inspiradores e inovadores. Cada projeto é uma demonstração do meu compromisso com a excelência técnica e a entrega de soluções sob medida para os clientes."
-        title="Projetos • Adam Neves"
+        description={`Cloud, DevOps and automation projects by ${profile.name}.`}
+        title={`Projects | ${profile.shortName}`}
       />
       <SmoothScrollSection>
         <Projects />

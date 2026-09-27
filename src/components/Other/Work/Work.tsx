@@ -22,11 +22,12 @@ import {
 } from "@/components/Animations/AdvancedTransition";
 import ProjectCard from "@/components/Other/ProjectCard/ProjectCard";
 import { Button } from "@/components/Other/UI/button";
+import { profile } from "@/data/profile";
 import { workData } from "@/data/work";
 import {
   RiArrowRightLine,
-  RiCodeBoxLine,
-  RiDatabase2Line,
+  RiCloudLine,
+  RiGitMergeLine,
 } from "react-icons/ri";
 
 interface GitHubProject {
@@ -57,12 +58,9 @@ const Work = () => {
     try {
       setIsLoading(true);
 
-      // Usar o nome de usuário GitHub das variáveis de ambiente ou valor padrão
-      const username = process.env.NEXT_PUBLIC_GITHUB_USERNAME || "adamsnows";
-
-      // Fazer chamada à API para buscar projetos do GitHub com tag "highlight"
+      // Repos tagged with the "highlight" topic are merged with workData
       const response = await fetch(
-        `/api/github/projects?username=${username}&portfolioTag=highlight`
+        `/api/github/projects?username=${profile.githubUsername}&portfolioTag=${profile.highlightTopic}`
       );
 
       if (response.ok) {
@@ -188,14 +186,15 @@ const Work = () => {
             ref={titleRef}
             className="section-title mb-4 bg-gradient-to-r from-primary via-secondary to-primary bg-clip-text text-transparent bg-300%"
           >
-            LATEST PROJECTS
+            HIGHLIGHTED WORK
           </h2>
           <p className="text-justify text-sm mb-8 leading-relaxed lg:mt-20 ">
-            Each project reflects a commitment to{" "}
-            <span className="text-primary font-medium">innovation</span>,{" "}
-            <span className="text-primary font-medium">efficiency</span> and an
-            exceptional user experience, demonstrating comprehensive skills and
-            a deep understanding of modern development needs.
+            Hands-on projects where I build, ship, and operate systems end to
+            end, with{" "}
+            <span className="text-primary font-medium">automation</span>,{" "}
+            <span className="text-primary font-medium">security</span> and{" "}
+            <span className="text-primary font-medium">observability</span>{" "}
+            built in from the first commit.
           </p>
 
           <div className="mb-8 w-full">
@@ -204,12 +203,12 @@ const Work = () => {
                 variants={fadeInUp}
                 className="flex items-start py-4 p-3 rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm"
               >
-                <RiCodeBoxLine className="text-primary text-xl mt-1 mr-1 w-20" />
+                <RiGitMergeLine className="text-primary text-xl mt-1 mr-1 w-20" />
                 <div>
-                  <h3 className="font-medium mb-1">Front-End Expertise</h3>
+                  <h3 className="font-medium mb-1">Automated Delivery</h3>
                   <p className="text-xs text-white/70">
-                    Advanced interfaces with React, Next.js and sophisticated
-                    animations
+                    CI/CD pipelines with quality and security gates before
+                    every deploy
                   </p>
                 </div>
               </motion.div>
@@ -218,12 +217,12 @@ const Work = () => {
                 variants={fadeInUp}
                 className="flex items-start p-3 rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm"
               >
-                <RiDatabase2Line className="text-primary text-xl mt-1 mr-1 w-20" />
+                <RiCloudLine className="text-primary text-xl mt-1 mr-1 w-20" />
                 <div>
-                  <h3 className="font-medium mb-1">Robust Back-End</h3>
+                  <h3 className="font-medium mb-1">Cloud Infrastructure</h3>
                   <p className="text-xs text-white/70">
-                    Efficient APIs, optimized databases and scalable
-                    architecture
+                    Containerized workloads on AWS and GCP, monitored and
+                    right-sized
                   </p>
                 </div>
               </motion.div>
@@ -306,18 +305,6 @@ const Work = () => {
                         inferredProject.language = "shopify";
                     }
 
-                    // Ensure language is a valid type or undefined
-                    if (
-                      inferredProject.language &&
-                      ![
-                        "typescript",
-                        "javascript",
-                        "python",
-                        "shopify",
-                      ].includes(inferredProject.language)
-                    ) {
-                      inferredProject.language = undefined;
-                    }
 
                     return (
                       <SwiperSlide

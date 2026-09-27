@@ -10,41 +10,11 @@ import {
   RiMailSendFill,
 } from 'react-icons/ri';
 
+import { profile } from '@/data/profile';
+
 import { highlightTechArray } from './syntax-highlighter';
 
-const techStackData = [
-  { name: 'React', category: 'frontend', featured: true },
-  { name: 'Next.js', category: 'frontend', featured: true },
-  { name: 'TypeScript', category: 'language', featured: true },
-  { name: 'Node.js', category: 'backend', featured: true },
-  { name: 'Git', category: 'tools', featured: false },
-  { name: 'GitHub', category: 'tools', featured: false },
-  { name: 'GitLab', category: 'tools', featured: false },
-  { name: 'Python', category: 'language', featured: true },
-  { name: 'GraphQL', category: 'backend', featured: false },
-  { name: 'Tailwind', category: 'frontend', featured: false },
-  { name: 'Sass', category: 'frontend', featured: false },
-  { name: 'FastAPI', category: 'backend', featured: false },
-  { name: 'Django', category: 'backend', featured: false },
-  { name: 'Express', category: 'backend', featured: false },
-  { name: 'NestJS', category: 'backend', featured: false },
-  { name: 'Vue', category: 'frontend', featured: false },
-  { name: 'Docker', category: 'devops', featured: false },
-  { name: 'Figma', category: 'design', featured: false },
-  { name: 'Jest', category: 'testing', featured: false },
-  { name: 'Linux', category: 'os', featured: false },
-  { name: 'Postman', category: 'tools', featured: false },
-  { name: 'Insomnia', category: 'tools', featured: false },
-  { name: 'Figma', category: 'tools', featured: false },
-  { name: 'Vercel', category: 'hosting', featured: false },
-  { name: 'Vite', category: 'frontend', featured: false },
-  { name: 'Bootstrap', category: 'frontend', featured: false },
-  { name: 'MongoDB', category: 'database', featured: false },
-  { name: 'PostgreSQL', category: 'database', featured: false },
-  { name: 'AWS', category: 'cloud', featured: false },
-  { name: 'GCP', category: 'cloud', featured: false },
-  { name: 'GitHub Actions', category: 'ci-cd', featured: false },
-];
+const techStackData = profile.techStack;
 
 import {
   fadeInDown,
@@ -61,6 +31,22 @@ import ProfessionalBadge from '@/components/Other/ProfessionalBadge/Professional
 import Socials from '@/components/Other/Socials/Socials';
 import { Button } from '@/components/Other/UI/button';
 
+/** Wraps each highlight word found in `text` with the accent color. */
+function highlightWords(text: string, words: readonly string[]) {
+  if (words.length === 0) return text;
+  const escaped = words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const parts = text.split(new RegExp(`(${escaped.join('|')})`, 'g'));
+  return parts.map((part, i) =>
+    words.includes(part) ? (
+      <span key={i} className="text-primary font-semibold">
+        {part}
+      </span>
+    ) : (
+      part
+    ),
+  );
+}
+
 const InitialHome = () => {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const codeBlockRef = useRef<HTMLPreElement>(null);
@@ -69,20 +55,32 @@ const InitialHome = () => {
 
   useEffect(() => {
     if (titleRef.current) {
-      const letters = titleRef.current.textContent?.split('') || [];
+      const words = (titleRef.current.textContent || '').split(' ');
       titleRef.current.innerHTML = '';
 
-      letters.forEach((letter) => {
-        const span = document.createElement('span');
-        span.textContent = letter;
-        span.style.opacity = '0';
-        span.style.display = 'inline-block';
-        titleRef.current?.appendChild(span);
+      // Letters are animated one by one, but each word stays an unbreakable
+      // group so the name never wraps mid-word and spaces are preserved.
+      words.forEach((word, wordIndex) => {
+        const wordSpan = document.createElement('span');
+        wordSpan.style.display = 'inline-block';
+        wordSpan.style.whiteSpace = 'nowrap';
+        word.split('').forEach((letter) => {
+          const span = document.createElement('span');
+          span.textContent = letter;
+          span.className = 'title-letter';
+          span.style.opacity = '0';
+          span.style.display = 'inline-block';
+          wordSpan.appendChild(span);
+        });
+        titleRef.current?.appendChild(wordSpan);
+        if (wordIndex < words.length - 1) {
+          titleRef.current?.appendChild(document.createTextNode(' '));
+        }
       });
 
-      gsap.to(titleRef.current.children, {
+      gsap.to(titleRef.current.querySelectorAll('.title-letter'), {
         opacity: 1,
-        stagger: 0.1,
+        stagger: 0.05,
         duration: 0.5,
         y: 0,
         ease: 'power2.out',
@@ -98,42 +96,24 @@ const InitialHome = () => {
       acc[tech.category].push(tech.name);
       return acc;
     }, {} as Record<string, string[]>);
+    const pick = (...categories: string[]) =>
+      categories.flatMap((c) => techByCategory[c] || []);
 
-    const skillsObject = {
-      frontend: techByCategory.frontend || [],
-      backend: techByCategory.backend || [],
-      database: techByCategory.database || [],
-      devOps: [
-        ...(techByCategory.devops || []),
-        ...(techByCategory.cloud || []),
-        ...(techByCategory['ci-cd'] || []),
-      ],
-      tools: techByCategory.tools || [],
-    };
+    const str = (v: string) => `<span style="color:#CE9178">'${v}'</span>`;
+    const key = (k: string) => `<span style="color:#9CDCFE">${k}</span>`;
 
-    return `<span style="color:#6A9955">// Fullstack developer with diverse skills</span>
-<span style="color:#569CD6">const</span> developer = {
-  <span style="color:#9CDCFE">name</span>: <span style="color:#CE9178">'Adam Neves'</span>,
-  <span style="color:#9CDCFE">skills</span>: {
-    <span style="color:#9CDCFE">frontend</span>: ${highlightTechArray(
-      skillsObject.frontend,
-    )},
-    <span style="color:#9CDCFE">backend</span>: ${highlightTechArray(
-      skillsObject.backend,
-    )},
-    <span style="color:#9CDCFE">database</span>: ${highlightTechArray(
-      skillsObject.database,
-    )},
-    <span style="color:#9CDCFE">devOps</span>: ${highlightTechArray(
-      skillsObject.devOps,
-    )},
-    <span style="color:#9CDCFE">tools</span>: ${highlightTechArray(
-      skillsObject.tools,
-    )}
+    return `<span style="color:#6A9955">// Every change: tested, scanned, traceable</span>
+<span style="color:#569CD6">const</span> engineer = {
+  ${key('name')}: ${str(profile.shortName)},
+  ${key('role')}: ${str(profile.headline)},
+  ${key('stack')}: {
+    ${key('cloud')}: ${highlightTechArray(pick('cloud'))},
+    ${key('containers')}: ${highlightTechArray(pick('containers'))},
+    ${key('delivery')}: ${highlightTechArray(pick('ci-cd', 'iac'))},
+    ${key('observability')}: ${highlightTechArray(pick('observability'))}
   },
-  <span style="color:#9CDCFE">createSolution</span>: (<span style="color:#4FC1FF">problem</span>) <span style="color:#569CD6">=></span> {
-    <span style="color:#569CD6">return</span> <span style="color:#4EC9B0">robustAndScalableSolution</span>;
-  }
+  ${key('ship')}: (<span style="color:#4FC1FF">change</span>) <span style="color:#569CD6">=></span>
+    <span style="color:#4EC9B0">test</span>(change) && <span style="color:#4EC9B0">scan</span>(change) && <span style="color:#4EC9B0">deploy</span>(change)
 };`;
   }, []);
 
@@ -286,7 +266,7 @@ const InitialHome = () => {
               mb-6 text-primary tracking-[4px] flex justify-center xl:justify-start"
             >
               <ProfessionalBadge
-                text="Full Stack Developer"
+                text={profile.headline}
                 icon={<StackIcon size={14} />}
                 animated={true}
                 gradient={true}
@@ -295,24 +275,16 @@ const InitialHome = () => {
 
             <h1
               ref={titleRef}
-              className="text-[45px] xl:text-[60px] font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text"
+              className="text-[36px] sm:text-[45px] xl:text-[52px] leading-tight mb-4 font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text"
             >
-              ADAM NEVES
+              {profile.name.toUpperCase()}
             </h1>
 
             <motion.p
               variants={fadeInDown}
-              className="max-w-[500px] mx-auto xl:mx-0 text-sm mb-5 leading-relaxed text-justify"
+              className="max-w-[500px] mx-auto xl:mx-0 text-sm mb-5 leading-relaxed text-center xl:text-left"
             >
-              <span className="text-primary font-semibold">FullStack</span>{' '}
-              development with a pronounced focus and enthusiasm for creating
-              powerful and innovative solutions. My experience covers both{' '}
-              <span className="text-primary font-semibold">front-end</span> and{' '}
-              <span className="text-primary font-semibold">back-end</span>,
-              allowing me to build complete and integrated applications. I am
-              constantly looking for new challenges that allow me to learn and
-              apply the latest technologies, ensuring the delivery of robust,
-              scalable, and secure products.
+              {highlightWords(profile.about, profile.aboutHighlights)}
             </motion.p>
 
             <motion.div
@@ -329,19 +301,17 @@ const InitialHome = () => {
                   />
                 </Button>
               </Link>
-              <Link
-                target="_blank"
-                href="https://drive.google.com/file/d/1-Fc_jtaHOwTODyT30z70gX7ZqK5n94vP/view?usp=sharing"
-                aria-label="cv"
-              >
-                <Button variant="secondary" className="gap-x-2 group">
-                  Download CV
-                  <RiDownloadFill
-                    size={18}
-                    className="transition-transform group-hover:translate-y-1"
-                  />
-                </Button>
-              </Link>
+              {profile.cvUrl && (
+                <Link target="_blank" href={profile.cvUrl} aria-label="cv">
+                  <Button variant="secondary" className="gap-x-2 group">
+                    Download CV
+                    <RiDownloadFill
+                      size={18}
+                      className="transition-transform group-hover:translate-y-1"
+                    />
+                  </Button>
+                </Link>
+              )}
             </motion.div>
 
             <motion.div variants={fadeInRight} className="hidden md:block mb-8">
@@ -386,7 +356,7 @@ const InitialHome = () => {
                   >
                     <span>
                       +{techStackData.filter((tech) => !tech.featured).length}{' '}
-                      mais
+                      more
                     </span>
                     <RiAddLine className="text-xs" />
                   </button>
@@ -408,7 +378,7 @@ const InitialHome = () => {
 
             <motion.div variants={fadeInRight}>
               <Socials
-                containerStyles="flex gap-x-6 mx-auto xl:mx-0"
+                containerStyles="flex gap-x-6 justify-center xl:justify-start"
                 iconsStyles="text-foreground text-[22px] hover:text-primary transition-all"
               />
             </motion.div>
@@ -421,55 +391,16 @@ const InitialHome = () => {
               distance={50}
             >
               <DevImg
-                alt="initial image"
+                alt="Cloud delivery pipeline illustration"
                 priority
                 containerStyles="w-[510px] h-[520px] relative flex items-center"
                 containerStylesImage="w-full h-auto"
-                imgSrc="/people/adam-face.png"
+                imgSrc="/hero-cloud.svg"
               />
             </FloatingElement>
 
-            {/* <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.8 }}
-              className="absolute top-[24%] -left-[5rem]"
-            >
-              <Badge
-                containerStyles="animate-up-down-3"
-                icon={<RiBriefcase4Fill />}
-                endCountNum={new Date().getFullYear() - 2022}
-                badgeText="anos de experiência"
-              />
-            </motion.div> */}
 
-            {/* <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1 }}
-              className="absolute top-[80%] -left-[1rem]"
-            >
-              <Badge
-                containerStyles="animate-up-down-2"
-                icon={<RiTodoFill />}
-                endCountNum={32}
-                badgeText="Projetos finalizados"
-              />
-            </motion.div> */}
 
-            {/* <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 1.2 }}
-              className="absolute top-[55%] -right-8"
-            >
-              <Badge
-                containerStyles="animate-up-down-1"
-                icon={<RiTeamFill />}
-                endCountNum={12}
-                badgeText="Clientes satisfeitos"
-              />
-            </motion.div> */}
 
             {/* Code block */}
             <div className="absolute -left-20 bottom-[-220px] z-30 ">

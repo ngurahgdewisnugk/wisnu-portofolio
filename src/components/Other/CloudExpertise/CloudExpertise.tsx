@@ -2,11 +2,11 @@ import { motion, useAnimation } from "framer-motion";
 import { useEffect, useRef } from "react";
 import {
   RiCloudLine,
-  RiCodeSSlashLine,
-  RiDatabase2Line,
-  RiSecurePaymentLine,
-  RiServerLine,
-  RiTerminalBoxLine,
+  RiGitMergeLine,
+  RiLineChartLine,
+  RiShieldCheckLine,
+  RiStackLine,
+  RiTaskLine,
 } from "react-icons/ri";
 import { useInView } from "react-intersection-observer";
 
@@ -18,19 +18,19 @@ import {
 } from "@/components/Animations/AdvancedTransition";
 import ClientOnly from "@/components/Animations/ClientOnly";
 
-type BackendCardProps = {
+type ExpertiseCardProps = {
   icon: React.ReactNode;
   title: string;
   description: string;
   delay?: number;
 };
 
-const BackendCard = ({
+const ExpertiseCard = ({
   icon,
   title,
   description,
   delay = 0,
-}: BackendCardProps) => {
+}: ExpertiseCardProps) => {
   return (
     <motion.div
       variants={fadeInUp}
@@ -44,7 +44,7 @@ const BackendCard = ({
   );
 };
 
-const BackendExpertise = () => {
+const CloudExpertise = () => {
   const controls = useAnimation();
   const { ref, inView } = useInView({
     threshold: 0.2,
@@ -64,16 +64,16 @@ const BackendExpertise = () => {
     if (inView && terminalRef.current && !hasAnimated.current) {
       hasAnimated.current = true;
       const terminal = terminalRef.current as HTMLPreElement;
-      const text = `$ node server.js
-Initializing server...
-Connecting to database...
-Connection successful!
-Setting up routes...
-API endpoints registered
-Middleware configured
-Starting server on port 3000
-Server is running on http://localhost:3000
-Ready to handle requests...`;
+      const text = `$ git push origin main
+[ci]  lint ........................ passed
+[ci]  unit tests .................. passed
+[ci]  SAST + secret scan .......... passed
+[cd]  docker build -t app:3f9c2e1 . done
+[cd]  image scan (HIGH,CRITICAL) .. 0 found
+[cd]  push ghcr.io/.../app:3f9c2e1  done
+[cd]  deploy to production ........ done
+[cd]  smoke test /health .......... 200 OK
+Release 3f9c2e1 is live.`;
 
       const lines = text.split("\n");
       let lineIndex = 0;
@@ -107,7 +107,7 @@ Ready to handle requests...`;
   }, [inView]);
 
   return (
-    <section className="lg:py-5 lg:pb-10 relative ">
+    <section className="lg:py-5 lg:pb-10 xl:pt-48 relative">
       {/* Background decoration */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 right-0 w-64 h-64 bg-primary/5 rounded-full filter blur-3xl opacity-30"></div>
@@ -126,11 +126,11 @@ Ready to handle requests...`;
             variants={fadeInUp}
             className="text-3xl md:text-4xl font-bold mb-6 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent"
           >
-            Back-End Expertise
+            Cloud &amp; DevOps Expertise
           </motion.h2>
           <motion.p variants={fadeInUp} className="text-lg">
-            Robust, secure and scalable architectures for high-performance
-            applications
+            Shipping changes to the cloud quickly, safely, and with evidence
+            for every release
           </motion.p>
         </motion.div>
 
@@ -147,45 +147,45 @@ Ready to handle requests...`;
               repeatType: "reverse",
             }}
           />
-          <BackendCard
-            icon={<RiServerLine />}
-            title="RESTful API"
-            description="API development following best standards and practices, with complete documentation via Swagger/OpenAPI."
+          <ExpertiseCard
+            icon={<RiGitMergeLine />}
+            title="CI/CD Automation"
+            description="GitHub Actions pipelines that lint, test, scan, build, and deploy, with production releases only from main."
             delay={0.1}
           />
 
-          <BackendCard
-            icon={<RiDatabase2Line />}
-            title="Databases"
-            description="Expertise in SQL and NoSQL, efficient data modeling, optimized queries, and cache implementation."
+          <ExpertiseCard
+            icon={<RiCloudLine />}
+            title="AWS Infrastructure"
+            description="EC2, VPC, security groups, IAM and S3 set up with least privilege and cost awareness in mind."
             delay={0.2}
           />
 
-          <BackendCard
-            icon={<RiSecurePaymentLine />}
-            title="Security"
-            description="Implementation of JWT authentication, OAuth, protection against SQL injection and other common attacks."
+          <ExpertiseCard
+            icon={<RiStackLine />}
+            title="Containers"
+            description="Docker images built once and promoted by commit SHA, run with Docker Compose, with hands-on Kubernetes practice."
             delay={0.3}
           />
 
-          <BackendCard
-            icon={<RiTerminalBoxLine />}
-            title="Microservices"
-            description="Distributed architecture, service communication, load balancing, and system resilience."
+          <ExpertiseCard
+            icon={<RiTaskLine />}
+            title="Release Management"
+            description="Years of production releases in banking: change approval, rollback plans, and release evidence."
             delay={0.4}
           />
 
-          <BackendCard
-            icon={<RiCloudLine />}
-            title="Cloud & DevOps"
-            description="Deployment on AWS, Azure, containerization with Docker, orchestration with Kubernetes, CI/CD."
+          <ExpertiseCard
+            icon={<RiShieldCheckLine />}
+            title="Security &amp; Compliance"
+            description="Secrets kept out of code, dependency and image scanning as pipeline gates, and IT risk assessment."
             delay={0.5}
           />
 
-          <BackendCard
-            icon={<RiCodeSSlashLine />}
-            title="Advanced Node.js"
-            description="Mastery of Express, NestJS, asynchronous processes, streams, workers, and performance optimization."
+          <ExpertiseCard
+            icon={<RiLineChartLine />}
+            title="Monitoring"
+            description="Prometheus metrics, Grafana dashboards and structured logs to see what production is actually doing."
             delay={0.6}
           />
         </div>
@@ -204,7 +204,7 @@ Ready to handle requests...`;
               <div className="w-3 h-3 rounded-full bg-red-500"></div>
               <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
               <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <div className="ml-2 text-xs text-white/60">server.js</div>
+              <div className="ml-2 text-xs text-white/60">pipeline.log</div>
             </div>
             <ClientOnly>
               <pre
@@ -215,33 +215,33 @@ Ready to handle requests...`;
           </motion.div>
 
           <motion.div variants={fadeInRight} className="space-y-6">
-            <h3 className="text-2xl font-bold">System Architecture</h3>
+            <h3 className="text-2xl font-bold">How I Ship</h3>
             <p className="text-white/80 text-justify">
-              I build backend systems focused on performance, scalability, and
-              security, using software engineering best practices to ensure
-              clean, testable, and easily maintainable code.
+              Banking taught me that a release is only as good as its evidence.
+              I build delivery pipelines where every step is automated,
+              repeatable, and leaves an audit trail.
             </p>
 
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-primary rounded-full"></div>
-                <span>Design patterns and SOLID principles</span>
+                <span>Every image tagged with its commit SHA</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-primary rounded-full"></div>
-                <span>Automated testing and TDD</span>
+                <span>Quality and security gates block bad builds</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-primary rounded-full"></div>
-                <span>Layered and hexagonal architecture</span>
+                <span>Secrets in a vault, never in the repo</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-primary rounded-full"></div>
-                <span>Distributed systems and horizontal scalability</span>
+                <span>Health checks and smoke tests after every deploy</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-primary rounded-full"></div>
-                <span>Advanced monitoring and logging</span>
+                <span>Rollback plan ready before release</span>
               </div>
             </div>
           </motion.div>
@@ -251,4 +251,4 @@ Ready to handle requests...`;
   );
 };
 
-export default BackendExpertise;
+export default CloudExpertise;

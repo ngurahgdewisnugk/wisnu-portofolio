@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 510 520" role="img" aria-label="Code flowing from a git commit through a CI/CD pipeline into cloud servers">
+  <defs>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7A90FF"/>
+      <stop offset="1" stop-color="#5EEAD4"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#7A90FF" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#7A90FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2040"/>
+      <stop offset="1" stop-color="#11142a"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="265" cy="190" r="230" fill="url(#glow)"/>
+
+  <!-- cloud -->
+  <path d="M150 190 a62 62 0 0 1 58-78 a82 82 0 0 1 152 18 a56 56 0 0 1 14 110 H164 a52 52 0 0 1 -14-50z"
+        fill="url(#card)" stroke="url(#accent)" stroke-width="3"/>
+
+  <!-- servers inside the cloud -->
+  <g fill="#0b0d1f" stroke="#7A90FF" stroke-opacity="0.8" stroke-width="2">
+    <rect x="198" y="150" width="54" height="72" rx="8"/>
+    <rect x="262" y="138" width="54" height="84" rx="8"/>
+    <rect x="326" y="158" width="44" height="64" rx="8"/>
+  </g>
+  <g fill="#5EEAD4">
+    <circle cx="212" cy="166" r="4"/><circle cx="212" cy="184" r="4"/><circle cx="212" cy="202" r="4" fill="#7A90FF"/>
+    <circle cx="276" cy="154" r="4"/><circle cx="276" cy="172" r="4"/><circle cx="276" cy="190" r="4"/><circle cx="276" cy="208" r="4" fill="#7A90FF"/>
+    <circle cx="340" cy="174" r="4"/><circle cx="340" cy="192" r="4" fill="#7A90FF"/>
+  </g>
+  <g stroke="#9499CC" stroke-opacity="0.5" stroke-width="3" stroke-linecap="round">
+    <line x1="222" y1="166" x2="240" y2="166"/><line x1="222" y1="184" x2="240" y2="184"/>
+    <line x1="286" y1="154" x2="304" y2="154"/><line x1="286" y1="172" x2="304" y2="172"/><line x1="286" y1="190" x2="304" y2="190"/>
+    <line x1="350" y1="174" x2="360" y2="174"/>
+  </g>
+
+  <!-- pipeline path -->
+  <path d="M70 420 C 120 420, 120 330, 190 330 S 300 330, 300 250"
+        fill="none" stroke="url(#accent)" stroke-width="3" stroke-dasharray="8 8"/>
+
+  <!-- stages -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" fill="#e6e8ff" text-anchor="middle">
+    <g>
+      <circle cx="70" cy="420" r="26" fill="#11142a" stroke="#7A90FF" stroke-width="2"/>
+      <circle cx="70" cy="420" r="7" fill="#7A90FF"/>
+      <text x="70" y="468">commit</text>
+    </g>
+    <g>
+      <rect x="120" y="344" width="86" height="34" rx="17" fill="#11142a" stroke="#5EEAD4" stroke-width="2"/>
+      <text x="163" y="366">test ✓</text>
+    </g>
+    <g>
+      <rect x="224" y="310" width="86" height="34" rx="17" fill="#11142a" stroke="#5EEAD4" stroke-width="2"/>
+      <text x="267" y="332">scan ✓</text>
+    </g>
+    <g>
+      <rect x="318" y="262" width="96" height="34" rx="17" fill="#11142a" stroke="#7A90FF" stroke-width="2"/>
+      <text x="366" y="284">deploy ✓</text>
+    </g>
+  </g>
+
+  <!-- container -->
+  <g transform="translate(398 330)">
+    <rect width="78" height="56" rx="8" fill="#11142a" stroke="#7A90FF" stroke-width="2"/>
+    <g stroke="#7A90FF" stroke-opacity="0.6" stroke-width="2">
+      <line x1="19" y1="10" x2="19" y2="46"/><line x1="39" y1="10" x2="39" y2="46"/><line x1="59" y1="10" x2="59" y2="46"/>
+    </g>
+    <text x="39" y="76" font-family="ui-monospace, Menlo, monospace" font-size="12" fill="#9A9ABB" text-anchor="middle">image:sha</text>
+  </g>
+</svg>

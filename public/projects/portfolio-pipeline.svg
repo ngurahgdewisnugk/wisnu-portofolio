@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" role="img" aria-label="CI/CD pipeline stages from lint to deploy">
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#7A90FF"/>
+      <stop offset="1" stop-color="#5EEAD4"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="400" rx="16" fill="#0d1024"/>
+  <text x="40" y="62" font-family="ui-monospace, Menlo, monospace" font-size="16" fill="#9A9ABB">.github/workflows</text>
+  <text x="40" y="96" font-family="system-ui, sans-serif" font-size="28" font-weight="700" fill="#ffffff">Commit → Production</text>
+  <line x1="70" y1="210" x2="530" y2="210" stroke="url(#a)" stroke-width="4"/>
+  <g font-family="ui-monospace, Menlo, monospace" font-size="15" fill="#e6e8ff" text-anchor="middle">
+    <g><circle cx="70" cy="210" r="22" fill="#11142a" stroke="#5EEAD4" stroke-width="3"/><text x="70" y="216" fill="#5EEAD4">✓</text><text x="70" y="262">lint</text></g>
+    <g><circle cx="162" cy="210" r="22" fill="#11142a" stroke="#5EEAD4" stroke-width="3"/><text x="162" y="216" fill="#5EEAD4">✓</text><text x="162" y="262">test</text></g>
+    <g><circle cx="254" cy="210" r="22" fill="#11142a" stroke="#5EEAD4" stroke-width="3"/><text x="254" y="216" fill="#5EEAD4">✓</text><text x="254" y="262">sast</text></g>
+    <g><circle cx="346" cy="210" r="22" fill="#11142a" stroke="#7A90FF" stroke-width="3"/><text x="346" y="216" fill="#7A90FF">✓</text><text x="346" y="262">build</text></g>
+    <g><circle cx="438" cy="210" r="22" fill="#11142a" stroke="#7A90FF" stroke-width="3"/><text x="438" y="216" fill="#7A90FF">✓</text><text x="438" y="262">scan</text></g>
+    <g><circle cx="530" cy="210" r="22" fill="#7A90FF"/><text x="530" y="216" fill="#0d1024">✓</text><text x="530" y="262">deploy</text></g>
+  </g>
+  <text x="40" y="350" font-family="ui-monospace, Menlo, monospace" font-size="14" fill="#9A9ABB">GitHub Actions · Trivy · GHCR · EC2 · Prometheus</text>
+</svg>

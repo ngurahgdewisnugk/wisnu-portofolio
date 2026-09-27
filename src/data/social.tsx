@@ -1,35 +1,16 @@
-import { FaDev } from "react-icons/fa";
-import {
-  RiGithubFill,
-  RiInstagramFill,
-  RiLinkedinFill,
-  RiTwitterFill,
-} from "react-icons/ri";
+import { RiGithubFill, RiLinkedinFill } from "react-icons/ri";
+
+import { profile } from "@/data/profile";
 
 export const icons = [
   {
-    path: "https://github.com/adamsnows",
+    path: profile.links.github,
     name: <RiGithubFill />,
-    title: "Github",
+    title: "GitHub",
   },
   {
-    path: "https://dev.to/adamsnows",
-    name: <FaDev />,
-    title: "DEV.TO",
-  },
-  {
-    path: "https://www.instagram.com/adamsnows",
-    name: <RiInstagramFill />,
-    title: "Instagram",
-  },
-  {
-    path: "https://x.com/adamsnows",
-    name: <RiTwitterFill />,
-    title: "X",
-  },
-  {
-    path: "https://www.linkedin.com/in/adam-neves",
+    path: profile.links.linkedin,
     name: <RiLinkedinFill />,
-    title: "Linkedin",
+    title: "LinkedIn",
   },
 ];

@@ -1,8 +1,14 @@
-import Socials from "@/components/Other/Socials/Socials";
 import Link from "next/link";
 import { RiGithubFill } from "react-icons/ri";
 
+import Socials from "@/components/Other/Socials/Socials";
+import { profile } from "@/data/profile";
+import { getVersionInfo } from "@/lib/version";
+
 const Footer = () => {
+  // Evaluated at render time on the server, so it shows the running image version.
+  const { version, commitShort } = getVersionInfo();
+
   return (
     <footer className="bg-tertiary py-12">
       <div className="container mx-auto">
@@ -13,16 +19,23 @@ const Footer = () => {
           />
 
           <div className="text-center lg:text-start text-muted-foreground mb-3">
-            Copyright &copy; Adam Neves. All rights reserved
+            &copy; {new Date().getFullYear()} {profile.name}
           </div>
           <Link
-            href="https://github.com/adamsnows/my-portfolio"
+            href={profile.links.sourceCode}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 text-white/50 hover:text-primary transition-all text-sm"
+            className="flex items-center gap-2 text-white/50 hover:text-primary transition-all text-sm mb-2"
           >
             <RiGithubFill className="text-lg" />
-            View code on GitHub
+            View source &amp; CI/CD pipeline
+          </Link>
+          <Link
+            href="/version"
+            className="font-mono text-xs text-white/30 hover:text-primary transition-all"
+            aria-label="Deployed version"
+          >
+            v{version} ({commitShort})
           </Link>
         </div>
       </div>
