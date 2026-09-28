@@ -1,0 +1,253 @@
+# Continuous Deployment to AWS EC2.
+#
+# Runs only after the CI workflow succeeds on main (or manually on main).
+# Pull requests can never reach this workflow, its permissions, or the
+# production environment secrets.
+#
+#   release: build -> Trivy scan -> push to GHCR (deployed by immutable digest)
+#   deploy:  OIDC to AWS -> open SSH for this runner only -> deploy with
+#            automatic rollback -> public smoke test -> close SSH again
+#
+# All third-party actions are pinned to full commit SHAs (see ci.yml).
+
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+# Never run two deployments at once, and never cancel one halfway.
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+env:
+  IMAGE_NAME: ghcr.io/ngurahgdewisnugk/wisnu-portofolio
+  AWS_REGION: ap-southeast-1
+
+jobs:
+  release:
+    name: Build, scan, push image
+    if: >-
+      (github.event_name == 'workflow_run'
+        && github.event.workflow_run.conclusion == 'success'
+        && github.event.workflow_run.event != 'pull_request')
+      || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # The exact commit CI tested (workflow_run) or the current main (manual).
+      GIT_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    outputs:
+      image: ${{ steps.push.outputs.image }}
+      sha: ${{ steps.meta.outputs.sha }}
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.GIT_SHA }}
+          persist-credentials: false
+
+      - name: Collect build metadata
+        id: meta
+        run: |
+          {
+            echo "sha=${GIT_SHA}"
+            echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "version=$(node -p "require('./package.json').version")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ env.GIT_SHA }}
+          build-args: |
+            GIT_SHA=${{ env.GIT_SHA }}
+            BUILD_TIME=${{ steps.meta.outputs.build_time }}
+            VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Same gate as CI, applied to the exact image that will ship.
+      - name: Trivy image scan (fail on fixable HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.70.0
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.GIT_SHA }}
+          scanners: vuln,secret
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: "1"
+
+      - name: Push to GHCR
+        id: push
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+        run: |
+          printf '%s' "$REGISTRY_TOKEN" | docker login ghcr.io --username "$REGISTRY_USER" --password-stdin
+          docker tag "${IMAGE_NAME}:${GIT_SHA}" "${IMAGE_NAME}:latest"
+          docker push --quiet "${IMAGE_NAME}:${GIT_SHA}"
+          docker push --quiet "${IMAGE_NAME}:latest"
+          image="$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE_NAME}:${GIT_SHA}")"
+          docker logout ghcr.io
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+          echo "Pushed ${image}"
+
+  deploy:
+    name: Deploy to EC2
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: http://${{ vars.EC2_HOST }}
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    env:
+      EC2_HOST: ${{ vars.EC2_HOST }}
+      EC2_SG_ID: ${{ vars.EC2_SG_ID }}
+      IMAGE: ${{ needs.release.outputs.image }}
+      GIT_SHA: ${{ needs.release.outputs.sha }}
+    steps:
+      - name: Checkout the tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.GIT_SHA }}
+          persist-credentials: false
+
+      # Short-lived credentials via OIDC; no AWS keys are stored in GitHub.
+      - name: Assume deploy role (OIDC)
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: gha-deploy-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Allow SSH from this runner only
+        run: |
+          runner_ip="$(curl -fsS https://checkip.amazonaws.com)"
+          echo "RUNNER_IP=${runner_ip}" >> "$GITHUB_ENV"
+          aws ec2 authorize-security-group-ingress --group-id "$EC2_SG_ID" --ip-permissions \
+            "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=${runner_ip}/32,Description=github-actions-run-${GITHUB_RUN_ID}}]"
+          echo "Port 22 opened for ${runner_ip}/32 for this run only"
+
+      - name: Configure SSH (pinned host key)
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host portfolio
+            HostName ${EC2_HOST}
+            User deploy
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ConnectTimeout 10
+          EOF
+          for attempt in 1 2 3 4 5 6; do
+            if ssh portfolio true; then
+              echo "SSH ready"
+              exit 0
+            fi
+            echo "SSH not ready yet (attempt ${attempt}), retrying..."
+            sleep 5
+          done
+          echo "::error::Could not connect to ${EC2_HOST} over SSH"
+          exit 1
+
+      - name: Upload deployment files
+        run: |
+          ssh portfolio 'mkdir -p /opt/portfolio/nginx /opt/portfolio/scripts'
+          scp -q deploy/docker-compose.yml portfolio:/opt/portfolio/docker-compose.yml
+          scp -q deploy/nginx/nginx.conf portfolio:/opt/portfolio/nginx/nginx.conf
+          scp -q deploy/scripts/deploy.sh portfolio:/opt/portfolio/scripts/deploy.sh
+
+      # Secrets travel over stdin only, never as command-line arguments.
+      - name: Write runtime configuration (.env)
+        env:
+          GH_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
+        run: |
+          printf 'GITHUB_USERNAME=%s\nGITHUB_TOKEN=%s\n' "$GITHUB_REPOSITORY_OWNER" "$GH_API_TOKEN" \
+            | ssh portfolio 'umask 077 && cat > /opt/portfolio/.env'
+
+      - name: Deploy with automatic rollback
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_USER: ${{ github.actor }}
+        run: |
+          # Arguments are expanded here on the runner on purpose and shell-quoted
+          # with %q before being sent; the registry token goes over stdin.
+          args="$(printf '%q ' "$IMAGE" "$GIT_SHA" "$REGISTRY_USER")"
+          # shellcheck disable=SC2029
+          printf '%s' "$REGISTRY_TOKEN" \
+            | ssh portfolio "bash /opt/portfolio/scripts/deploy.sh ${args}"
+
+      - name: Smoke test over the public internet
+        run: |
+          base="http://${EC2_HOST}"
+          curl -fsS --retry 5 --retry-delay 3 --retry-all-errors "${base}/health"
+          echo
+
+          commit="$(curl -fsS "${base}/version" | jq -r .commit)"
+          if [ "$commit" != "$GIT_SHA" ]; then
+            echo "::error::/version reports ${commit}, expected ${GIT_SHA}"
+            exit 1
+          fi
+
+          home="$(curl -s -o /dev/null -w '%{http_code}' "${base}/")"
+          if [ "$home" != "200" ]; then
+            echo "::error::Home page returned HTTP ${home}"
+            exit 1
+          fi
+
+          metrics="$(curl -s -o /dev/null -w '%{http_code}' "${base}/api/metrics")"
+          if [ "$metrics" != "404" ]; then
+            echo "::error::/api/metrics is reachable from the internet (HTTP ${metrics})"
+            exit 1
+          fi
+
+          {
+            echo "### Deployed to production"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| URL | ${base} |"
+            echo "| Commit | \`${GIT_SHA}\` |"
+            echo "| Image | \`${IMAGE}\` |"
+            echo "| /health | 200 |"
+            echo "| /api/metrics from internet | 404 (blocked) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Close SSH for this runner
+        if: always() && env.RUNNER_IP != ''
+        run: |
+          aws ec2 revoke-security-group-ingress --group-id "$EC2_SG_ID" --ip-permissions \
+            "IpProtocol=tcp,FromPort=22,ToPort=22,IpRanges=[{CidrIp=${RUNNER_IP}/32}]"
+          echo "Port 22 closed for ${RUNNER_IP}/32"
+
+      - name: Remove SSH key from runner
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
