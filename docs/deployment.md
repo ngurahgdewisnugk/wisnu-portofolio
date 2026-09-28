@@ -45,7 +45,10 @@ curl -fsS https://checkip.amazonaws.com   # your public IP for admin SSH
 The admin key is for you (use a passphrase). The deploy key is for the pipeline
 only; it lands on the `deploy` user, which cannot forward ports or agents.
 
-### 2. AWS resources (AWS CloudShell, region ap-southeast-1)
+### 2. AWS resources (AWS CloudShell, region ap-southeast-2 / Sydney)
+
+The scripts pin the region themselves (CloudShell pre-sets `AWS_REGION` to the
+console's region, which would otherwise take precedence).
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/ngurahgdewisnugk/wisnu-portofolio/main/infra/aws-setup.sh

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Removes everything aws-setup.sh created, to stop all charges after grading.
 # Run in AWS CloudShell. Asks for confirmation first.
-# Region defaults to ap-southeast-1; override with REGION=... if needed.
+# Region defaults to ap-southeast-2 (Sydney); override with REGION=... if needed.
 #
 # Deletes: EC2 instance (and its encrypted root volume), Elastic IP,
 # security group, deploy role, admin key pair, budget.
@@ -11,7 +11,7 @@
 set -euo pipefail
 # CloudShell pre-sets AWS_REGION to the console's region, and AWS_REGION wins
 # over AWS_DEFAULT_REGION. Pin both so resources always land in REGION.
-REGION="${REGION:-ap-southeast-1}"
+REGION="${REGION:-ap-southeast-2}"
 export AWS_REGION="${REGION}"
 export AWS_DEFAULT_REGION="${REGION}"
 export AWS_PAGER=""

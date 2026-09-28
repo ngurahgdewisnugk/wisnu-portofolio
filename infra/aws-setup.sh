@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-time AWS setup for the portfolio, meant to run in AWS CloudShell
-# (ap-southeast-1). Safe to re-run: existing resources are reused.
+# (ap-southeast-2, Sydney). Safe to re-run: existing resources are reused.
 #
 # Required environment variables:
 #   MY_IP          your laptop's public IPv4 (SSH admin access), e.g. 203.0.113.10
@@ -8,7 +8,7 @@
 #   DEPLOY_PUBKEY  contents of ~/.ssh/portfolio-deploy.pub
 # Optional:
 #   ALERT_EMAIL    email for a USD 10/month AWS Budget alert
-#   REGION         defaults to ap-southeast-1 (Singapore)
+#   REGION         defaults to ap-southeast-2 (Sydney)
 #
 # Creates: EC2 key pair, security group, t3.small Ubuntu 24.04 instance,
 # Elastic IP, GitHub OIDC provider, least-privilege deploy role, budget.
@@ -21,7 +21,7 @@ set -euo pipefail
 
 # CloudShell pre-sets AWS_REGION to the console's region, and AWS_REGION wins
 # over AWS_DEFAULT_REGION. Pin both so resources always land in REGION.
-REGION="${REGION:-ap-southeast-1}"
+REGION="${REGION:-ap-southeast-2}"
 export AWS_REGION="${REGION}"
 export AWS_DEFAULT_REGION="${REGION}"
 export AWS_PAGER=""
