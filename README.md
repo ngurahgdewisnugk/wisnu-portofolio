@@ -1,12 +1,13 @@
 # Wisnu · Cloud Automation & Release Engineer
 
 [![CI](https://github.com/ngurahgdewisnugk/wisnu-portofolio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ngurahgdewisnugk/wisnu-portofolio/actions/workflows/ci.yml)
+[![CD](https://github.com/ngurahgdewisnugk/wisnu-portofolio/actions/workflows/cd.yml/badge.svg)](https://github.com/ngurahgdewisnugk/wisnu-portofolio/actions/workflows/cd.yml)
 
 Personal portfolio of **Ngurah Gede Wisnu**, built as the capstone project of the
 Digital Skola Cloud Engineer Bootcamp (Batch 6). The site itself is the demo: every
 change goes through a CI/CD pipeline before it reaches an AWS EC2 server.
 
-> 🚧 **Status:** app and CI pipeline done. CD to AWS and monitoring are being added.
+> 🚧 **Status:** app, CI, and CD to AWS done. Monitoring is being added.
 > This README will be completed in Phase 5.
 
 ## Tech stack
@@ -33,6 +34,20 @@ It never deploys. All jobs must pass before a change can be merged.
 
 Supply-chain hardening: every third-party action is pinned to a full commit SHA,
 and downloaded tools (gitleaks, Trivy) are checked against their published checksums.
+
+## CD pipeline
+
+`.github/workflows/cd.yml` runs only after CI succeeds on `main` (or manually on `main`).
+Pull requests never reach it. Full runbook: [docs/deployment.md](docs/deployment.md).
+
+| Job | Steps |
+| --- | --- |
+| Build, scan, push image | build the exact commit CI tested, Trivy scan, push `:<sha>` and `:latest` to GHCR |
+| Deploy to EC2 | assume an AWS role via OIDC, open SSH for the runner's IP only, upload compose files, `deploy.sh` with automatic rollback, public smoke test, close SSH |
+
+Runtime on the server: Docker Compose with Nginx (reverse proxy, load balancer,
+rate limiting, JSON access logs) in front of 2 Next.js replicas. The image is
+deployed by digest (`image@sha256:…`), so what runs is exactly what was scanned.
 
 ## Run locally
 
@@ -84,6 +99,20 @@ Names only; values live in `.env` locally and in GitHub Secrets in CI.
 | --- | --- | --- |
 | `GITHUB_USERNAME` | No | GitHub owner for the Projects page (defaults to `src/data/profile.ts`) |
 | `GITHUB_TOKEN` | No | Read-only token; raises rate limits and enables the contributions chart |
+
+## Security measures
+
+- No secrets in the repo: runtime values come from GitHub environment secrets and are
+  written to the server over SSH stdin (never as command-line arguments).
+- No long-lived AWS keys: GitHub OIDC with a role that can only toggle port 22 on one
+  security group, and only from the `production` environment of this repo.
+- SSH is closed to the internet; each deploy opens it for the runner's /32 and closes it again.
+  The server's host key is pinned (`StrictHostKeyChecking yes`).
+- Separate `deploy` user and key for the pipeline; admin access uses a different key.
+- Gates in CI and CD: `npm audit`, Semgrep, gitleaks, Trivy. Actions pinned to commit SHAs.
+- Container runs as non-root with all Linux capabilities dropped and `no-new-privileges`.
+- `/api/metrics` is blocked at Nginx; API routes are rate limited.
+- EC2: IMDSv2 only, encrypted EBS, CPU credits in `standard` mode, budget alert.
 
 ## Adding a project to the site
 
