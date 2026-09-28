@@ -1,0 +1,48 @@
+# Production stack on the EC2 host (/opt/portfolio).
+# APP_IMAGE is set by deploy.sh to an immutable digest, e.g.
+#   ghcr.io/ngurahgdewisnugk/wisnu-portofolio@sha256:...
+name: portfolio
+
+services:
+  web:
+    image: ${APP_IMAGE:?APP_IMAGE must be set by deploy.sh}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+    expose:
+      - "3000"
+    # Horizontal scaling: Nginx balances across every replica (see nginx.conf).
+    deploy:
+      replicas: ${WEB_REPLICAS:-2}
+    mem_limit: 384m
+    cpus: 0.75
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:1.30.5-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/nginx-health"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    mem_limit: 64m
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging

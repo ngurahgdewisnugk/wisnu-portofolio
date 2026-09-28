@@ -6,12 +6,26 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-29
+
 ### Added
-- GitHub Actions CI: lint, typecheck, unit tests, build, `npm audit`, Semgrep SAST,
+- CD workflow: build, Trivy scan and push to GHCR, then deploy to AWS EC2 over SSH
+  after CI passes on `main`; deployed by image digest with a public smoke test.
+- `deploy/`: Docker Compose stack (Nginx + 2 Next.js replicas), Nginx config with
+  load balancing, rate limiting, JSON access logs and `/api/metrics` blocked.
+- `deploy/scripts/deploy.sh`: pull, `compose up --wait`, verify `/version`,
+  automatic rollback to the previous release on failure.
+- `infra/`: CloudShell scripts to create and tear down all AWS resources, and
+  EC2 user data (Docker, swap, log rotation, dedicated deploy user).
+- `docs/deployment.md` runbook.
+- CI workflow: lint, typecheck, unit tests, build, `npm audit`, Semgrep SAST,
   gitleaks secret scan, Docker build with Trivy image scan and container smoke test.
 - Unit tests for the hero code snippet (33 tests in total).
 
 ### Security
+- GitHub OIDC to AWS; the deploy role can only toggle port 22 on one security group.
+- SSH closed to the internet except for the runner's IP during a deploy; pinned host key.
+- Container hardening: all capabilities dropped, `no-new-privileges`, memory/CPU limits.
 - Removed every `innerHTML` write flagged by Semgrep: the hero code snippet and text
   animations are now rendered by React as escaped text.
 - All GitHub Actions pinned to full commit SHAs; tool downloads verified by checksum.
@@ -45,5 +59,6 @@ and the project uses [Semantic Versioning](https://semver.org/).
   WhatsApp button, reviews, unused 3D/animation components, and 15 unused dependencies.
 - All third-party photos and images; replaced with original SVG artwork.
 
-[Unreleased]: https://github.com/ngurahgdewisnugk/wisnu-portofolio/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/ngurahgdewisnugk/wisnu-portofolio/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/ngurahgdewisnugk/wisnu-portofolio/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ngurahgdewisnugk/wisnu-portofolio/releases/tag/v0.1.0
