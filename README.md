@@ -1,10 +1,12 @@
 # Wisnu · Cloud Automation & Release Engineer
 
+[![CI](https://github.com/ngurahgdewisnugk/wisnu-portofolio/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ngurahgdewisnugk/wisnu-portofolio/actions/workflows/ci.yml)
+
 Personal portfolio of **Ngurah Gede Wisnu**, built as the capstone project of the
 Digital Skola Cloud Engineer Bootcamp (Batch 6). The site itself is the demo: every
 change goes through a CI/CD pipeline before it reaches an AWS EC2 server.
 
-> 🚧 **Status:** Phase 1 (app skeleton) done. CI, CD, and monitoring are being added.
+> 🚧 **Status:** app and CI pipeline done. CD to AWS and monitoring are being added.
 > This README will be completed in Phase 5.
 
 ## Tech stack
@@ -15,6 +17,22 @@ change goes through a CI/CD pipeline before it reaches an AWS EC2 server.
 | Tests | Vitest, ESLint, `tsc` |
 | Container | Docker multi-stage build, Next.js standalone output, Node 22 Alpine |
 | Observability | `prom-client` metrics at `/api/metrics` |
+
+## CI pipeline
+
+`.github/workflows/ci.yml` runs on every push and on pull requests to `main`.
+It never deploys. All jobs must pass before a change can be merged.
+
+| Job | What it checks | Fails when |
+| --- | --- | --- |
+| Lint, typecheck, test, build | ESLint, `tsc --noEmit`, Vitest, `next build` | any error or lint warning |
+| Dependency audit | `npm audit` against `package-lock.json` | any HIGH/CRITICAL advisory |
+| SAST (Semgrep) | `p/javascript`, `p/typescript`, `p/react`, `p/secrets` | any ERROR-severity finding |
+| Secret scan (gitleaks) | every commit in the git history | any secret found |
+| Docker build, scan, smoke test | multi-stage build, Trivy image scan, container run | fixable HIGH/CRITICAL CVE or secret in the image, `/version` ≠ commit SHA, or container runs as root |
+
+Supply-chain hardening: every third-party action is pinned to a full commit SHA,
+and downloaded tools (gitleaks, Trivy) are checked against their published checksums.
 
 ## Run locally
 

@@ -12,7 +12,11 @@ import {
 
 import { profile } from '@/data/profile';
 
-import { highlightTechArray } from './syntax-highlighter';
+import {
+  buildEngineerSnippet,
+  sliceTokens,
+  tokensLength,
+} from '@/lib/code-snippet';
 
 const techStackData = profile.techStack;
 
@@ -49,14 +53,12 @@ function highlightWords(text: string, words: readonly string[]) {
 
 const InitialHome = () => {
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const codeBlockRef = useRef<HTMLPreElement>(null);
   const [techStackExpanded, setTechStackExpanded] = useState(false);
-  const animationInitializedRef = useRef(false);
 
   useEffect(() => {
     if (titleRef.current) {
       const words = (titleRef.current.textContent || '').split(' ');
-      titleRef.current.innerHTML = '';
+      titleRef.current.replaceChildren();
 
       // Letters are animated one by one, but each word stays an unbreakable
       // group so the name never wraps mid-word and spaces are preserved.
@@ -89,140 +91,56 @@ const InitialHome = () => {
     }
   }, []);
 
-  // Generate the code text for the animation - memoized to prevent re-creation
-  const codeText = useMemo(() => {
-    const techByCategory = techStackData.reduce((acc, tech) => {
-      if (!acc[tech.category]) acc[tech.category] = [];
-      acc[tech.category].push(tech.name);
+  // Code snippet as coloured text tokens (rendered by React, never as HTML).
+  const codeTokens = useMemo(() => {
+    const byCategory = techStackData.reduce((acc, tech) => {
+      (acc[tech.category] ??= []).push(tech.name);
       return acc;
     }, {} as Record<string, string[]>);
     const pick = (...categories: string[]) =>
-      categories.flatMap((c) => techByCategory[c] || []);
+      categories.flatMap((c) => byCategory[c] || []);
 
-    const str = (v: string) => `<span style="color:#CE9178">'${v}'</span>`;
-    const key = (k: string) => `<span style="color:#9CDCFE">${k}</span>`;
-
-    return `<span style="color:#6A9955">// Every change: tested, scanned, traceable</span>
-<span style="color:#569CD6">const</span> engineer = {
-  ${key('name')}: ${str(profile.shortName)},
-  ${key('role')}: ${str(profile.headline)},
-  ${key('stack')}: {
-    ${key('cloud')}: ${highlightTechArray(pick('cloud'))},
-    ${key('containers')}: ${highlightTechArray(pick('containers'))},
-    ${key('delivery')}: ${highlightTechArray(pick('ci-cd', 'iac'))},
-    ${key('observability')}: ${highlightTechArray(pick('observability'))}
-  },
-  ${key('ship')}: (<span style="color:#4FC1FF">change</span>) <span style="color:#569CD6">=></span>
-    <span style="color:#4EC9B0">test</span>(change) && <span style="color:#4EC9B0">scan</span>(change) && <span style="color:#4EC9B0">deploy</span>(change)
-};`;
+    return buildEngineerSnippet({
+      name: profile.shortName,
+      role: profile.headline,
+      stack: {
+        cloud: pick('cloud'),
+        containers: pick('containers'),
+        delivery: pick('ci-cd', 'iac'),
+        observability: pick('observability'),
+      },
+    });
   }, []);
+  const totalChars = useMemo(() => tokensLength(codeTokens), [codeTokens]);
+  const [typedChars, setTypedChars] = useState(0);
 
-  // Simple and reliable animation initialization
+  // Typing effect: reveal characters over ~6 seconds after a short delay.
+  // Users who prefer reduced motion get the full snippet immediately.
   useEffect(() => {
-    // Only run on client and once
-    if (typeof window === 'undefined' || animationInitializedRef.current)
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) {
+      setTypedChars(totalChars);
       return;
+    }
 
-    // Add minimal required styles
-    const addStyles = () => {
-      const styleId = 'code-animation-styles';
-      if (!document.getElementById(styleId)) {
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = `
-          .code-block {
-            transition: color 0.3s ease;
-          }
-        `;
-        document.head.appendChild(style);
-      }
+    const durationMs = 6000;
+    let frame = 0;
+    let start: number | undefined;
+    const step = (now: number) => {
+      start ??= now;
+      const progress = Math.min(1, (now - start) / durationMs);
+      setTypedChars(Math.floor(progress * totalChars));
+      if (progress < 1) frame = requestAnimationFrame(step);
     };
-
-    addStyles();
-
-    // Use a single timeout with adequate delay
-    const animationTimeout = setTimeout(() => {
-      if (codeBlockRef.current) {
-        try {
-          // Initialize with a safer animation configuration
-          gsap.to(
-            {},
-            {
-              duration: 6,
-              ease: 'power1.inOut',
-              onUpdate: function (this: { progress: () => number }) {
-                // Simple fallback in case setupCodeTypingAnimation fails
-                try {
-                  // Manually implement the typing animation to avoid issues
-                  if (codeBlockRef.current) {
-                    const progress = this.progress();
-                    const textLength = codeText.replace(/<[^>]*>/g, '').length;
-                    const currentLength = Math.floor(progress * textLength);
-
-                    // Create simplified typing effect
-                    let plainTextCount = 0;
-                    let displayHTML = '';
-                    let inTag = false;
-                    let currentTag = '';
-
-                    for (let i = 0; i < codeText.length; i++) {
-                      const char = codeText[i];
-
-                      if (char === '<') {
-                        inTag = true;
-                        currentTag += char;
-                      } else if (char === '>') {
-                        inTag = false;
-                        currentTag += char;
-                        displayHTML += currentTag;
-                        currentTag = '';
-                      } else if (inTag) {
-                        currentTag += char;
-                      } else {
-                        displayHTML += char;
-                        plainTextCount++;
-
-                        if (plainTextCount >= currentLength) {
-                          break;
-                        }
-                      }
-                    }
-
-                    codeBlockRef.current.innerHTML = displayHTML;
-                  }
-                } catch (err) {
-                  console.warn('Animation step error, using fallback:', err);
-                  if (codeBlockRef.current && !codeBlockRef.current.innerHTML) {
-                    codeBlockRef.current.innerHTML = codeText;
-                  }
-                }
-              },
-              onComplete: function () {
-                // Make sure the final state is set
-                if (codeBlockRef.current) {
-                  codeBlockRef.current.innerHTML = codeText;
-                }
-              },
-            },
-          );
-
-          // Mark as initialized to prevent re-runs
-          animationInitializedRef.current = true;
-        } catch (error) {
-          console.error('Animation error:', error);
-
-          // Simple fallback if animation fails
-          if (codeBlockRef.current) {
-            codeBlockRef.current.innerHTML = codeText;
-          }
-        }
-      }
+    const timeout = setTimeout(() => {
+      frame = requestAnimationFrame(step);
     }, 800);
 
     return () => {
-      clearTimeout(animationTimeout);
+      clearTimeout(timeout);
+      cancelAnimationFrame(frame);
     };
-  }, [codeText]);
+  }, [totalChars]);
 
   useEffect(() => {
     if (techStackExpanded) {
@@ -419,10 +337,15 @@ const InitialHome = () => {
                 >
                   <div className="code-container relative h-[260px]">
                     <pre
-                      ref={codeBlockRef}
                       className="text-xs text-white font-mono overflow-x-auto whitespace-pre-wrap h-full w-full"
-                      style={{ willChange: 'contents' }}
-                    ></pre>
+                      aria-label="Code snippet describing my tech stack"
+                    >
+                      {sliceTokens(codeTokens, typedChars).map((token, index) => (
+                        <span key={index} style={token.color ? { color: token.color } : undefined}>
+                          {token.text}
+                        </span>
+                      ))}
+                    </pre>
                   </div>
                 </ClientOnly>
               </div>

@@ -6,6 +6,19 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- GitHub Actions CI: lint, typecheck, unit tests, build, `npm audit`, Semgrep SAST,
+  gitleaks secret scan, Docker build with Trivy image scan and container smoke test.
+- Unit tests for the hero code snippet (33 tests in total).
+
+### Security
+- Removed every `innerHTML` write flagged by Semgrep: the hero code snippet and text
+  animations are now rendered by React as escaped text.
+- All GitHub Actions pinned to full commit SHAs; tool downloads verified by checksum.
+
+### Removed
+- Unused syntax-highlighter helpers and unused text animation styles.
+
 ## [0.1.0] - 2026-09-28
 
 ### Added
