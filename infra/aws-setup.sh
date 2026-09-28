@@ -8,6 +8,7 @@
 #   DEPLOY_PUBKEY  contents of ~/.ssh/portfolio-deploy.pub
 # Optional:
 #   ALERT_EMAIL    email for a USD 10/month AWS Budget alert
+#   REGION         defaults to ap-southeast-1 (Singapore)
 #
 # Creates: EC2 key pair, security group, t3.small Ubuntu 24.04 instance,
 # Elastic IP, GitHub OIDC provider, least-privilege deploy role, budget.
@@ -18,7 +19,11 @@ set -euo pipefail
 : "${ADMIN_PUBKEY:?set ADMIN_PUBKEY}"
 : "${DEPLOY_PUBKEY:?set DEPLOY_PUBKEY}"
 
-export AWS_DEFAULT_REGION="ap-southeast-1"
+# CloudShell pre-sets AWS_REGION to the console's region, and AWS_REGION wins
+# over AWS_DEFAULT_REGION. Pin both so resources always land in REGION.
+REGION="${REGION:-ap-southeast-1}"
+export AWS_REGION="${REGION}"
+export AWS_DEFAULT_REGION="${REGION}"
 export AWS_PAGER=""
 
 readonly PROJECT="wisnu-portofolio"
@@ -38,7 +43,7 @@ log() { printf '\n==> %s\n' "$*"; }
 tags() { printf 'ResourceType=%s,Tags=[{Key=Project,Value=%s},{Key=Name,Value=%s}]' "$1" "${PROJECT}" "$2"; }
 
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-log "Account ${ACCOUNT_ID}, region ${AWS_DEFAULT_REGION}"
+log "Account ${ACCOUNT_ID}, region ${AWS_REGION}"
 
 # --- 1. Admin key pair --------------------------------------------------------
 log "Key pair ${KEY_NAME}"
@@ -162,7 +167,7 @@ cat > /tmp/permissions.json <<JSON
       "ec2:AuthorizeSecurityGroupIngress",
       "ec2:RevokeSecurityGroupIngress"
     ],
-    "Resource": "arn:aws:ec2:${AWS_DEFAULT_REGION}:${ACCOUNT_ID}:security-group/${SG_ID}"
+    "Resource": "arn:aws:ec2:${AWS_REGION}:${ACCOUNT_ID}:security-group/${SG_ID}"
   }]
 }
 JSON
@@ -200,7 +205,7 @@ rm -f /tmp/admin.pub /tmp/user-data.sh /tmp/trust.json /tmp/permissions.json
 cat <<SUMMARY
 
 ============================================================
- Done. Save these values for GitHub (environment: production)
+ Done in region ${AWS_REGION}. Save these values for GitHub (environment: production)
 ------------------------------------------------------------
  Variable EC2_HOST             = ${PUBLIC_IP}
  Variable EC2_SG_ID            = ${SG_ID}

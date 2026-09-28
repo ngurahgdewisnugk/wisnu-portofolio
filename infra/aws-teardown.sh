@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Removes everything aws-setup.sh created, to stop all charges after grading.
-# Run in AWS CloudShell (ap-southeast-1). Asks for confirmation first.
+# Run in AWS CloudShell. Asks for confirmation first.
+# Region defaults to ap-southeast-1; override with REGION=... if needed.
 #
 # Deletes: EC2 instance (and its encrypted root volume), Elastic IP,
 # security group, deploy role, admin key pair, budget.
@@ -8,7 +9,11 @@
 # set DELETE_OIDC=1 to remove it too.
 
 set -euo pipefail
-export AWS_DEFAULT_REGION="ap-southeast-1"
+# CloudShell pre-sets AWS_REGION to the console's region, and AWS_REGION wins
+# over AWS_DEFAULT_REGION. Pin both so resources always land in REGION.
+REGION="${REGION:-ap-southeast-1}"
+export AWS_REGION="${REGION}"
+export AWS_DEFAULT_REGION="${REGION}"
 export AWS_PAGER=""
 
 readonly SG_NAME="portfolio-web-sg"
@@ -18,7 +23,7 @@ readonly ROLE_NAME="github-actions-portfolio-deploy"
 readonly KEY_NAME="portfolio-admin"
 
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-read -r -p "Delete all portfolio resources in account ${ACCOUNT_ID}? Type 'yes': " answer
+read -r -p "Delete all portfolio resources in account ${ACCOUNT_ID}, region ${AWS_REGION}? Type 'yes': " answer
 [[ "${answer}" == "yes" ]] || { echo "Aborted."; exit 1; }
 
 echo "==> Elastic IP"
