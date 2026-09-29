@@ -1,6 +1,6 @@
 {
   "name": "wisnu-portofolio",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "Personal portfolio of Ngurah Gede Wisnu, deployed to AWS EC2 with GitHub Actions CI/CD.",
   "license": "MIT",

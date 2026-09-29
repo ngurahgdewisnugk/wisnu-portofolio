@@ -6,6 +6,17 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-30
+
+### Fixed
+- Grafana memory limit raised from 512 MiB to 768 MiB. At 512 MiB the cgroup still hit
+  its limit ~48 times a minute: the working set is ~450 MiB (280 MiB process memory +
+  160 MiB of actively used files), so hot files were evicted and re-read from disk.
+
+### Changed
+- `docs/monitoring.md` memory budget uses measured working sets (cgroup `memory.stat`)
+  instead of `docker stats`, and explains how to read them.
+
 ## [0.3.1] - 2026-09-30
 
 ### Fixed

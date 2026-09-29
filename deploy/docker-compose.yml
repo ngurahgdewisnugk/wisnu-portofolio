@@ -95,9 +95,10 @@ services:
       - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
-    # Measured ~225 MiB in steady state. At 256m it hit the limit 33k times in
-    # 8 hours (cgroup memory.events "max") with throttled sockets.
-    mem_limit: 512m
+    # Working set ~450 MiB: ~280 MiB process memory (anon) + ~160 MiB of files it
+    # actively uses (active_file). At 256m and 512m the cgroup kept hitting its
+    # limit (memory.events "max"), evicting hot files and re-reading them.
+    mem_limit: 768m
     cpus: 0.5
     security_opt:
       - no-new-privileges:true
