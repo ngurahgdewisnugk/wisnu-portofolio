@@ -9,6 +9,9 @@
 # Optional:
 #   ALERT_EMAIL    email for a USD 10/month AWS Budget alert
 #   REGION         defaults to ap-southeast-2 (Sydney)
+#   GITHUB_OWNER_ID, GITHUB_REPO_ID
+#                  numeric IDs for the OIDC trust policy; looked up from the
+#                  public GitHub API when not set
 #
 # Creates: EC2 key pair, security group, t3.small Ubuntu 24.04 instance,
 # Elastic IP, GitHub OIDC provider, least-privilege deploy role, budget.
@@ -139,6 +142,24 @@ fi
 
 # --- 6. Least-privilege deploy role ---------------------------------------------
 log "IAM role ${ROLE_NAME}"
+# Repositories created on or after 15 July 2026 get an immutable OIDC subject:
+#   repo:<owner>@<owner_id>/<repo>@<repo_id>:environment:<env>
+# The numeric IDs never change, so a deleted and re-registered owner or repo
+# name cannot mint a token that matches this trust policy.
+if [[ -z "${GITHUB_OWNER_ID:-}" || -z "${GITHUB_REPO_ID:-}" ]]; then
+  repo_json="$(curl -fsS "https://api.github.com/repos/${GITHUB_REPO}")" || {
+    echo "GitHub API lookup failed; set GITHUB_OWNER_ID and GITHUB_REPO_ID and re-run" >&2
+    exit 1
+  }
+  GITHUB_OWNER_ID="$(jq -r '.owner.id' <<<"${repo_json}")"
+  GITHUB_REPO_ID="$(jq -r '.id' <<<"${repo_json}")"
+fi
+[[ "${GITHUB_OWNER_ID}" =~ ^[0-9]+$ && "${GITHUB_REPO_ID}" =~ ^[0-9]+$ ]] || {
+  echo "Could not resolve numeric GitHub IDs for ${GITHUB_REPO}" >&2
+  exit 1
+}
+OIDC_SUB="repo:${GITHUB_REPO%%/*}@${GITHUB_OWNER_ID}/${GITHUB_REPO#*/}@${GITHUB_REPO_ID}:environment:production"
+echo "trusted subject: ${OIDC_SUB}"
 # Only jobs running in the "production" environment of this repo can assume it.
 cat > /tmp/trust.json <<JSON
 {
@@ -150,7 +171,7 @@ cat > /tmp/trust.json <<JSON
     "Condition": {
       "StringEquals": {
         "${OIDC_HOST}:aud": "sts.amazonaws.com",
-        "${OIDC_HOST}:sub": "repo:${GITHUB_REPO}:environment:production"
+        "${OIDC_HOST}:sub": "${OIDC_SUB}"
       }
     }
   }]
