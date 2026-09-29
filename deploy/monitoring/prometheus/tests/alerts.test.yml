@@ -1,0 +1,72 @@
+# promtool unit tests for rules/alerts.yml.
+#   promtool test rules deploy/monitoring/prometheus/tests/alerts.test.yml
+rule_files:
+  - ../rules/alerts.yml
+
+evaluation_interval: 15s
+
+tests:
+  # A healthy site never fires SiteDown; a site down for 2m does.
+  - interval: 30s
+    input_series:
+      - series: 'probe_success{job="blackbox-http", instance="http://nginx/health"}'
+        values: "1 1 1 1 1 1"
+      - series: 'probe_success{job="blackbox-http", instance="http://nginx/"}'
+        values: "1 0 0 0 0 0 0"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: SiteDown
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: SiteDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: blackbox-http
+              instance: http://nginx/
+            exp_annotations:
+              summary: "http://nginx/ is failing its HTTP probe"
+              description: "Blackbox probe through Nginx has failed for 2 minutes."
+
+  # Losing every web replica fires NoHealthyWebReplica; one replica left does not.
+  - interval: 30s
+    input_series:
+      - series: 'up{job="portfolio-web", instance="172.18.0.3:3000"}'
+        values: "1 1 0 0 0 0 0"
+      - series: 'up{job="portfolio-web", instance="172.18.0.4:3000"}'
+        values: "1 1 1 1 0 0 0"
+    alert_rule_test:
+      - eval_time: 90s
+        alertname: NoHealthyWebReplica
+        exp_alerts: []
+      - eval_time: 3m30s
+        alertname: NoHealthyWebReplica
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job: portfolio-web
+            exp_annotations:
+              summary: "No Next.js replica is being scraped successfully"
+              description: "Every web replica is down or missing from Docker DNS."
+
+  # Memory: 5% available for 5 minutes fires HostLowMemory.
+  - interval: 1m
+    input_series:
+      - series: 'node_memory_MemAvailable_bytes{job="node", instance="node-exporter:9100"}'
+        values: "100+0x10"
+      - series: 'node_memory_MemTotal_bytes{job="node", instance="node-exporter:9100"}'
+        values: "2000+0x10"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: HostLowMemory
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: HostLowMemory
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: node
+              instance: node-exporter:9100
+            exp_annotations:
+              summary: "Less than 10% memory available"
+              description: "Available memory is 5% of total."

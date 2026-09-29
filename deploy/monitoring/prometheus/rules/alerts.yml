@@ -1,0 +1,92 @@
+# Alert rules, evaluated by Prometheus every 15s.
+# There is no Alertmanager on this single small host: firing alerts show up in
+# Prometheus (/alerts) and in the "Firing alerts" panel of the Grafana dashboard.
+# Unit tests: deploy/monitoring/prometheus/tests/alerts.test.yml (run in CI).
+groups:
+  - name: availability
+    rules:
+      - alert: SiteDown
+        expr: probe_success{job="blackbox-http"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }} is failing its HTTP probe"
+          description: "Blackbox probe through Nginx has failed for 2 minutes."
+
+      - alert: SiteSlow
+        expr: probe_duration_seconds{job="blackbox-http"} > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.instance }} takes more than 1s to respond"
+          description: "Probe duration is {{ $value | humanizeDuration }}."
+
+      - alert: NoHealthyWebReplica
+        expr: absent(up{job="portfolio-web"} == 1)
+        for: 1m
+        labels:
+          severity: critical
+          job: portfolio-web
+        annotations:
+          summary: "No Next.js replica is being scraped successfully"
+          description: "Every web replica is down or missing from Docker DNS."
+
+      - alert: TargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scrape target {{ $labels.job }}/{{ $labels.instance }} is down"
+          description: "Prometheus could not scrape this target for 2 minutes."
+
+  - name: host
+    rules:
+      - alert: HostHighCpu
+        expr: 1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU above 85% for 10 minutes"
+          description: "CPU usage is {{ $value | humanizePercentage }}. On a t3 in standard mode this also burns CPU credits."
+
+      - alert: HostCpuStealHigh
+        expr: avg by (instance) (rate(node_cpu_seconds_total{mode="steal"}[5m])) > 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU steal above 10%"
+          description: "The t3 instance is probably out of CPU credits and is being throttled to baseline."
+
+      - alert: HostLowMemory
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Less than 10% memory available"
+          description: "Available memory is {{ $value | humanizePercentage }} of total."
+
+      - alert: HostDiskAlmostFull
+        expr: node_filesystem_avail_bytes{mountpoint="/", fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{mountpoint="/", fstype!~"tmpfs|overlay"} < 0.15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Root filesystem has less than 15% free"
+          description: "Free space is {{ $value | humanizePercentage }}. Old images: docker image prune."
+
+  - name: app
+    rules:
+      - alert: EventLoopLagHigh
+        expr: portfolio_nodejs_eventloop_lag_p99_seconds > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node.js event loop p99 lag above 200ms on {{ $labels.instance }}"
+          description: "The replica is CPU bound or blocked; consider more replicas."
