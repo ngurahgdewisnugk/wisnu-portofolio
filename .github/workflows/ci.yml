@@ -213,3 +213,71 @@ jobs:
       - name: Container logs
         if: failure()
         run: docker logs app || true
+
+  deploy-config:
+    name: Deploy & monitoring config
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Same image tags as deploy/docker-compose.yml, so what is validated here
+    # is exactly what runs in production.
+    env:
+      PROMETHEUS_IMAGE: prom/prometheus:v3.13.4
+      BLACKBOX_IMAGE: prom/blackbox-exporter:v0.28.0
+      NGINX_IMAGE: nginx:1.30.5-alpine
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Image tags match docker-compose.yml
+        run: |
+          for image in "$PROMETHEUS_IMAGE" "$BLACKBOX_IMAGE" "$NGINX_IMAGE"; do
+            grep -q "image: ${image}\$" deploy/docker-compose.yml \
+              || { echo "::error::${image} is not the tag used in deploy/docker-compose.yml"; exit 1; }
+          done
+
+      - name: Compose file is valid (2 and 3 replicas)
+        working-directory: deploy
+        run: |
+          touch .env grafana.env
+          for replicas in 2 3; do
+            APP_IMAGE=ghcr.io/example/app@sha256:0 WEB_REPLICAS=$replicas docker compose config --quiet
+          done
+          echo "docker-compose.yml OK"
+
+      - name: Prometheus config and alert rules (promtool)
+        run: |
+          docker run --rm -v "$PWD/deploy/monitoring/prometheus:/etc/prometheus:ro" \
+            --entrypoint promtool "$PROMETHEUS_IMAGE" check config /etc/prometheus/prometheus.yml
+
+      - name: Alert rule unit tests (promtool)
+        run: |
+          docker run --rm -v "$PWD/deploy/monitoring/prometheus:/etc/prometheus:ro" \
+            -w /etc/prometheus/tests --entrypoint promtool "$PROMETHEUS_IMAGE" test rules alerts.test.yml
+
+      - name: Blackbox exporter config
+        run: |
+          docker run --rm -v "$PWD/deploy/monitoring/blackbox:/config:ro" \
+            "$BLACKBOX_IMAGE" --config.file=/config/blackbox.yml --config.check
+
+      - name: Nginx config
+        run: |
+          docker run --rm -v "$PWD/deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" \
+            "$NGINX_IMAGE" nginx -t
+
+      - name: Grafana dashboards and provisioning
+        run: |
+          for f in deploy/monitoring/grafana/dashboards/*.json; do
+            jq -e '.uid and .title and (.panels | length > 0)' "$f" > /dev/null \
+              || { echo "::error file=$f::missing uid, title or panels"; exit 1; }
+            dup="$(jq '[.panels[].id] | length - (unique | length)' "$f")"
+            [ "$dup" = "0" ] || { echo "::error file=$f::duplicate panel ids"; exit 1; }
+            bad="$(jq -r '[.panels[] | select(.type != "row") | .datasource.uid] | map(select(. != "prometheus")) | length' "$f")"
+            [ "$bad" = "0" ] || { echo "::error file=$f::panel not using datasource uid 'prometheus'"; exit 1; }
+            echo "$f: $(jq '.panels | length' "$f") panels OK"
+          done
+          grep -q 'uid: prometheus' deploy/monitoring/grafana/provisioning/datasources/prometheus.yml
+
+      - name: Shell scripts (shellcheck)
+        run: shellcheck deploy/scripts/deploy.sh infra/*.sh

@@ -28,7 +28,8 @@ sequenceDiagram
     CD->>EC2: deploy.sh <image@digest> <sha>
     EC2->>GHCR: pull image (short-lived token, logged out after)
     EC2->>EC2: compose up --wait, verify /version (else roll back)
-    CD->>EC2: public smoke test (/health, /version, / , /api/metrics = 404)
+    EC2->>EC2: monitoring up, reload configs, every Prometheus target UP
+    CD->>EC2: public smoke test (/health, /version, /, /api/metrics = 404, :9090/:3001 closed)
     CD->>AWS: close port 22 again
 ```
 
@@ -96,6 +97,8 @@ Settings → Environments → New environment `production`
 | Secret | `EC2_SSH_KEY` | contents of `~/.ssh/portfolio-deploy` (private key) |
 | Secret | `EC2_KNOWN_HOSTS` | output of `ssh-keyscan` in step 3 |
 | Secret | `GH_API_TOKEN` | optional, fine-grained read-only token for the GitHub API |
+| Secret | `GRAFANA_ADMIN_PASSWORD` | 16+ letters/digits: `openssl rand -hex 16` |
+| Variable | `WEB_REPLICAS` | optional, 1–3 (default 2): number of Next.js replicas |
 
 Also allow `aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd`
 in Settings → Actions → General.
@@ -108,7 +111,9 @@ in Settings → Actions → General.
 | Redeploy current `main` | Actions → CD → Run workflow (branch `main`). |
 | See what is live | `http://<EC2_HOST>/version`, or the footer of the site. |
 | Deployment history | GitHub → Environments → production; on the server `/opt/portfolio/.deploy/history.log`. |
-| Logs | `ssh -i ~/.ssh/portfolio-admin ubuntu@<EC2_HOST>` then `sudo docker compose --project-directory /opt/portfolio logs -f` |
+| Logs | `ssh -i ~/.ssh/portfolio-admin ubuntu@<EC2_HOST>` then `sudo docker compose --project-directory /opt/portfolio logs -f` (JSON queries: [monitoring.md](monitoring.md#logging)) |
+| Dashboard | SSH tunnel to `127.0.0.1:3001`, see [monitoring.md](monitoring.md#open-the-dashboard) |
+| Scale | Set variable `WEB_REPLICAS` (1–3), then Actions → CD → Run workflow |
 | Roll back | Automatic when a new release is unhealthy. Manually: revert the commit through a PR. |
 | Save money | EC2 → Stop instance. The Elastic IP keeps the address; start it again before a demo. |
 
