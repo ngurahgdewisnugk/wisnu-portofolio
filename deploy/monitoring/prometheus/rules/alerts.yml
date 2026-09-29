@@ -1,6 +1,6 @@
 # Alert rules, evaluated by Prometheus every 15s.
 # There is no Alertmanager on this single small host: firing alerts show up in
-# Prometheus (/alerts) and in the "Firing alerts" panel of the Grafana dashboard.
+# Grafana (Alerting -> Alert rules, and the "Firing alerts" dashboard panels).
 # Unit tests: deploy/monitoring/prometheus/tests/alerts.test.yml (run in CI).
 groups:
   - name: availability

@@ -16,6 +16,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - `docs/monitoring.md` memory budget now shows measured usage next to each limit.
 - SSH tunnel command gains keep-alive and `ExitOnForwardFailure`, plus a check for a
   dropped tunnel; both issues added to the troubleshooting table.
+- Grafana is now the only UI: the tunnel forwards port 3001 only, Prometheus' alert
+  rules are listed in Grafana Alerting (datasource `manageAlerts`), and the docs map
+  each Prometheus UI page to its Grafana equivalent. Prometheus stays bound to
+  `127.0.0.1:9090` for Grafana and the deploy check.
 
 ## [0.3.0] - 2026-09-30
 

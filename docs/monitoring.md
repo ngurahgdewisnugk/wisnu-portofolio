@@ -26,14 +26,13 @@ flowchart LR
     prom --> nx -->|:8080 stub_status| nginx
     prom --> ne -->|/proc, /sys, /| host[(EC2 host)]
     graf --> prom
-    admin([Admin laptop]) -. SSH tunnel .-> graf
-    admin -. SSH tunnel .-> prom
+    admin([Admin laptop]) -. SSH tunnel :3001 .-> graf
 ```
 
 | Component | Image | Role | Reachable from |
 | --- | --- | --- | --- |
-| Prometheus | `prom/prometheus:v3.13.4` (LTS) | scrapes every 15s, evaluates alert rules, keeps 7 days / max 1 GB | `127.0.0.1:9090` on the host (SSH tunnel) |
-| Grafana | `grafana/grafana:13.2.3` | dashboard, provisioned from git | `127.0.0.1:3001` on the host (SSH tunnel) |
+| Prometheus | `prom/prometheus:v3.13.4` (LTS) | scrapes every 15s, evaluates alert rules, keeps 7 days / max 1 GB. Backend only: its UI is not needed | Grafana, and `deploy.sh` through `127.0.0.1:9090` on the host |
+| Grafana | `grafana/grafana:13.2.3` | the only UI: dashboard, ad-hoc queries, alert rules; provisioned from git | `127.0.0.1:3001` on the host (SSH tunnel) |
 | node_exporter | `prom/node-exporter:v1.12.1` | CPU, steal, memory, swap, disk, load of the instance | Docker network only |
 | blackbox_exporter | `prom/blackbox-exporter:v0.28.0` | synthetic HTTP checks of `/` and `/health` through Nginx | Docker network only |
 | nginx-prometheus-exporter | `nginx/nginx-prometheus-exporter:1.5.3` | Nginx request and connection counters (`stub_status`) | Docker network only |
@@ -45,32 +44,39 @@ touching the Prometheus config.
 
 ## Open the dashboard
 
-Admin SSH is allowed only from your own IP (`MY_IP` in `aws-setup.sh`). The `deploy`
-user cannot forward ports, so use the admin key:
+Grafana is the only UI; one tunnel to port 3001 is enough. Admin SSH is allowed only
+from your own IP (`MY_IP` in `aws-setup.sh`; update the security group rule when your
+IP changes). The `deploy` user cannot forward ports, so use the admin key:
 
 ```bash
 ssh -i ~/.ssh/portfolio-admin -N \
     -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes \
     -L 3001:127.0.0.1:3001 \
-    -L 9090:127.0.0.1:9090 \
     ubuntu@<EC2_HOST>
 ```
 
 Keep that terminal open; the tunnel lives only as long as the command runs. The
-keep-alive options stop idle drops, and `ExitOnForwardFailure` makes it fail loudly if a
+keep-alive options stop idle drops, and `ExitOnForwardFailure` makes it fail loudly if the
 local port is already taken. If pages stop loading, first check the tunnel is still
-listening: `ss -ltnp | grep -E ':(3001|9090) '`.
+listening: `ss -ltnp | grep ':3001 '` (Linux/WSL) or `netstat -ano | findstr :3001` (Windows).
 
-Then open:
+Then open <http://localhost:3001> and sign in with the Grafana admin account (created at
+first start from `GRAFANA_ADMIN_PASSWORD`). Everything the Prometheus UI offered is here:
 
-- Grafana: <http://localhost:3001>, user `admin`, password = the `GRAFANA_ADMIN_PASSWORD`
-  secret. The home page is the **Portfolio · Production overview** dashboard.
-- Prometheus: <http://localhost:9090/targets> (all targets should be UP) and
-  <http://localhost:9090/alerts>.
+| Need | In Grafana |
+| --- | --- |
+| Overall health | Home: **Portfolio · Production overview** dashboard |
+| Scrape targets (was Prometheus `/targets`) | **Explore** → Prometheus → query `up` → **Table** view: one row per target, value `1` = up |
+| Ad-hoc PromQL (was Prometheus `/query`) | **Explore** → Prometheus |
+| Alert rules and their state (was Prometheus `/alerts`) | **Alerting → Alert rules** (data source-managed rules from Prometheus), and the dashboard's *Firing alerts* panels |
+
+Without a browser, the same target list is one command on the server:
+`curl -s 127.0.0.1:9090/api/v1/targets | jq -r '.data.activeTargets[] | "\(.labels.job)\t\(.labels.instance)\t\(.health)"'`.
 
 Grafana applies `GF_SECURITY_ADMIN_PASSWORD` only when its database is created (first
-start). To rotate it later: `sudo docker compose --project-directory /opt/portfolio exec
-grafana grafana cli admin reset-admin-password <new>`, then update the secret too.
+start). To rotate it later, use Profile → Change password in Grafana, or
+`sudo docker compose --project-directory /opt/portfolio exec grafana grafana cli admin reset-admin-password <new>`,
+then update the secret too.
 
 ## Dashboard
 
@@ -105,7 +111,7 @@ Rules: `deploy/monitoring/prometheus/rules/alerts.yml`, unit tested with
 | `HostDiskAlmostFull` | root filesystem less than 15% free for 10 minutes | warning |
 | `EventLoopLagHigh` | event loop p99 lag above 200ms for 5 minutes | warning |
 
-Trade-off: there is no Alertmanager, so alerts are **visible** (Prometheus `/alerts`
+Trade-off: there is no Alertmanager, so alerts are **visible** (Grafana's Alerting page
 and the dashboard) but not **sent** anywhere. Adding Alertmanager with an email or
 Slack receiver is the next step; it was left out to keep the 2 GB instance within
 its memory budget.
