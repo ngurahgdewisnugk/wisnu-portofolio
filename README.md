@@ -58,8 +58,9 @@ Prometheus scrapes every web replica (discovered through Docker DNS), the EC2 ho
 (blackbox_exporter). Grafana shows one provisioned dashboard: service health, traffic
 and latency, per-replica CPU/memory/event loop lag, and host CPU, steal, memory and disk.
 Nine alert rules (site down, no healthy replica, slow site, host pressure, event loop
-lag) are unit tested in CI. Prometheus and Grafana listen on `127.0.0.1` only and are
-opened through an SSH tunnel. Every deploy checks that all targets are up.
+lag) are unit tested in CI. Grafana is the only UI, opened through an SSH tunnel;
+Prometheus is a backend for Grafana and for the deploy check, never exposed. Every
+deploy checks that all targets are up.
 
 Logs: Nginx writes one JSON line per request (status, latency, upstream replica), all
 containers rotate at 10 MB × 3, and deployments and rollbacks are recorded on the server.
@@ -144,8 +145,9 @@ Set by the pipeline on the server only (GitHub environment `production`):
 - Gates in CI and CD: `npm audit`, Semgrep, gitleaks, Trivy. Actions pinned to commit SHAs.
 - Container runs as non-root with all Linux capabilities dropped and `no-new-privileges`.
 - `/api/metrics` is blocked at Nginx; API routes are rate limited.
-- Prometheus and Grafana bind to `127.0.0.1` (SSH tunnel only); exporters have no host
-  ports; the CD smoke test fails if `:9090` or `:3001` answer from the internet.
+- Prometheus and Grafana bind to `127.0.0.1` on the host (Grafana through an SSH tunnel);
+  exporters have no host ports; the CD smoke test fails if `:9090` or `:3001` answer
+  from the internet.
 - EC2: IMDSv2 only, encrypted EBS, CPU credits in `standard` mode, budget alert.
 
 ## Adding a project to the site

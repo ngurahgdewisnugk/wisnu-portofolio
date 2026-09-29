@@ -12,3 +12,7 @@ datasources:
     jsonData:
       timeInterval: 15s
       httpMethod: POST
+      prometheusType: Prometheus
+      # List Prometheus' own alert rules under Grafana -> Alerting -> Alert rules,
+      # so the Prometheus UI is never needed.
+      manageAlerts: true

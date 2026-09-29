@@ -346,7 +346,7 @@
       "type": "stat",
       "id": 6,
       "title": "Firing alerts",
-      "description": "Prometheus alert rules currently firing (see Prometheus /alerts).",
+      "description": "Prometheus alert rules currently firing (details: Grafana → Alerting → Alert rules).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
