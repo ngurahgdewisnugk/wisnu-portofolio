@@ -38,7 +38,7 @@ and downloaded tools (gitleaks, Trivy) are checked against their published check
 ## CD pipeline
 
 `.github/workflows/cd.yml` runs only after CI succeeds on `main` (or manually on `main`).
-Pull requests never reach it. Full runbook: [docs/deployment.md](docs/deployment.md).
+Pull requests never reach it. Full runbook and troubleshooting: [docs/deployment.md](docs/deployment.md).
 
 | Job | Steps |
 | --- | --- |
