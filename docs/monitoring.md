@@ -170,22 +170,34 @@ sudo APP_IMAGE="$(cat .deploy/current_image)" docker compose up -d --scale web=3
 
 ### Why the ceiling is 3
 
-Memory on the t3.small (2 GiB RAM + 2 GiB swap). Usage was measured with
-`docker stats` in production with 2 replicas, about 8 hours after the monitoring release:
+Memory on the t3.small (2 GiB RAM + 2 GiB swap), measured in production with 2 replicas:
 
-| Service | Limit | Measured usage |
+| Service | Limit | Measured working set |
 | --- | --- | --- |
-| web, per replica | 384 MiB | ~50 MiB |
+| web, per replica | 384 MiB | ~50–100 MiB (grows after start, see the dashboard) |
 | Nginx | 64 MiB | ~6 MiB |
-| Prometheus | 256 MiB | ~162 MiB |
-| Grafana | 512 MiB | ~223 MiB |
+| Prometheus | 256 MiB | ~162 MiB (cgroup `max` events: 0) |
+| Grafana | 768 MiB | ~450 MiB (~280 MiB process + ~160 MiB actively used files) |
 | 3 exporters | 3 × 48 MiB | ~54 MiB together |
-| **Total, 2 replicas / 3 replicas** | **1744 MiB / 2128 MiB** | **~545 MiB / ~595 MiB** |
+| **Total, 2 replicas / 3 replicas** | **2000 MiB / 2384 MiB** | **~865 MiB / ~965 MiB** |
 
-With 2 replicas the host reported ~1.0 GiB available and 73 MiB of swap in use, so a
-third replica (~+50 MiB) fits comfortably. Limits are ceilings, not usage: their sum may
-exceed RAM because the containers never peak together, and swap absorbs short bursts.
-The cap of 3 keeps that bet safe; the dashboard's memory panels show the real numbers.
+With 2 replicas the host reported ~886 MiB available and ~56 MiB of swap in use, so a
+third replica (~+100 MiB) fits. Limits are ceilings, not usage: their sum exceeds RAM
+because the containers never peak together, and swap absorbs short bursts. The cap of 3
+keeps that bet safe; the dashboard's memory panels show the real numbers.
+
+How the Grafana number was measured: `docker stats` alone is misleading here, because on
+cgroup v2 it includes file cache. The split comes from the container's cgroup files:
+
+```bash
+d=/sys/fs/cgroup/system.slice/docker-$(sudo docker inspect -f '{{.Id}}' portfolio-grafana-1).scope
+sudo cat $d/memory.events        # "max" = times the limit was hit
+sudo grep -E '^(anon|active_file|inactive_file) ' $d/memory.stat
+```
+
+`anon` is process memory; `active_file` is files in active use (evicting them costs disk
+reads); `inactive_file` is cache the kernel can drop for free. A limit is right when `max`
+stays near 0 with `anon + active_file` well below it.
 Beyond 3 replicas the next steps are vertical (a larger instance type) or a second
 instance behind an AWS load balancer with an Auto Scaling group, which would also move
 monitoring off the app host.
