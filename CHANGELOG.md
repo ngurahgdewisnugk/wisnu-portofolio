@@ -6,6 +6,34 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-30
+
+### Added
+- Monitoring stack in `deploy/monitoring/`, deployed by the same pipeline:
+  Prometheus v3.13 (LTS), Grafana 13, node_exporter, blackbox_exporter and
+  nginx-prometheus-exporter. Web replicas are discovered through Docker DNS.
+- Grafana dashboard as code ("Portfolio · Production overview", 21 panels): service
+  health, traffic and latency, per-replica CPU/memory/event loop lag, EC2 host.
+- Nine Prometheus alert rules with `promtool` unit tests.
+- Nginx `stub_status` on an internal port for request and connection metrics.
+- CI job "Deploy & monitoring config": compose, promtool config and rule tests,
+  blackbox and Nginx config checks, dashboard JSON checks, shellcheck.
+- Manual horizontal scaling through the `WEB_REPLICAS` environment variable (1–3).
+- `docs/monitoring.md`: tunnel access, dashboard, alerts, log queries, scaling.
+
+### Changed
+- `deploy.sh` starts the app services first, then the monitoring stack, and fails
+  the deploy (without rolling back the healthy app) if any Prometheus target is down.
+- CD writes `grafana.env` from the `GRAFANA_ADMIN_PASSWORD` secret and checks that
+  Prometheus and Grafana ports are closed to the internet.
+- Every step in `deploy.sh`'s `start` functions now returns explicitly on failure,
+  because they run inside `if` (where `set -e` is off) and now have steps after
+  `compose up`.
+
+### Fixed
+- `nginx.conf` changes were not applied on deploy because the Nginx container is not
+  recreated; `deploy.sh` now validates and reloads Nginx (and Prometheus) configs.
+
 ## [0.2.0] - 2026-09-29
 
 ### Added
