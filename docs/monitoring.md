@@ -50,10 +50,16 @@ user cannot forward ports, so use the admin key:
 
 ```bash
 ssh -i ~/.ssh/portfolio-admin -N \
+    -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes \
     -L 3001:127.0.0.1:3001 \
     -L 9090:127.0.0.1:9090 \
     ubuntu@<EC2_HOST>
 ```
+
+Keep that terminal open; the tunnel lives only as long as the command runs. The
+keep-alive options stop idle drops, and `ExitOnForwardFailure` makes it fail loudly if a
+local port is already taken. If pages stop loading, first check the tunnel is still
+listening: `ss -ltnp | grep -E ':(3001|9090) '`.
 
 Then open:
 
@@ -158,18 +164,22 @@ sudo APP_IMAGE="$(cat .deploy/current_image)" docker compose up -d --scale web=3
 
 ### Why the ceiling is 3
 
-Memory limits on the t3.small (2 GiB RAM + 2 GiB swap):
+Memory on the t3.small (2 GiB RAM + 2 GiB swap). Usage was measured with
+`docker stats` in production with 2 replicas, about 8 hours after the monitoring release:
 
-| Service | Limit |
-| --- | --- |
-| web × 2 (default) / × 3 | 768 MiB / 1152 MiB |
-| Nginx | 64 MiB |
-| Prometheus | 256 MiB |
-| Grafana | 256 MiB |
-| 3 exporters | 3 × 48 MiB |
-| **Total limits** | **1488 MiB / 1872 MiB** |
+| Service | Limit | Measured usage |
+| --- | --- | --- |
+| web, per replica | 384 MiB | ~50 MiB |
+| Nginx | 64 MiB | ~6 MiB |
+| Prometheus | 256 MiB | ~162 MiB |
+| Grafana | 512 MiB | ~223 MiB |
+| 3 exporters | 3 × 48 MiB | ~54 MiB together |
+| **Total, 2 replicas / 3 replicas** | **1744 MiB / 2128 MiB** | **~545 MiB / ~595 MiB** |
 
-Limits are ceilings, not usage; the dashboard's memory panels show the real numbers.
+With 2 replicas the host reported ~1.0 GiB available and 73 MiB of swap in use, so a
+third replica (~+50 MiB) fits comfortably. Limits are ceilings, not usage: their sum may
+exceed RAM because the containers never peak together, and swap absorbs short bursts.
+The cap of 3 keeps that bet safe; the dashboard's memory panels show the real numbers.
 Beyond 3 replicas the next steps are vertical (a larger instance type) or a second
 instance behind an AWS load balancer with an Auto Scaling group, which would also move
 monitoring off the app host.

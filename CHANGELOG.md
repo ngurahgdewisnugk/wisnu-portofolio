@@ -6,6 +6,17 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-09-30
+
+### Fixed
+- Grafana ran at its 256 MiB memory limit: the cgroup hit it 33k times in ~8 hours
+  (constant reclaim and socket throttling, no OOM kill). Limit raised to 512 MiB.
+
+### Changed
+- `docs/monitoring.md` memory budget now shows measured usage next to each limit.
+- SSH tunnel command gains keep-alive and `ExitOnForwardFailure`, plus a check for a
+  dropped tunnel; both issues added to the troubleshooting table.
+
 ## [0.3.0] - 2026-09-30
 
 ### Added
