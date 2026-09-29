@@ -1014,9 +1014,23 @@
         "defaults": {
           "custom": {
             "align": "auto"
-          }
+          },
+          "noValue": "No alerts firing ✓"
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*"
+            },
+            "properties": [
+              {
+                "id": "noValue",
+                "value": "–"
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "showHeader": true,

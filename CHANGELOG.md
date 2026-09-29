@@ -16,6 +16,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 ### Changed
 - `docs/monitoring.md` memory budget uses measured working sets (cgroup `memory.stat`)
   instead of `docker stats`, and explains how to read them.
+- Dashboard: the *Firing alerts* table shows "No alerts firing ✓" instead of "No data"
+  when nothing is firing (panel `noValue`; empty cells still show "–").
 
 ## [0.3.1] - 2026-09-30
 
