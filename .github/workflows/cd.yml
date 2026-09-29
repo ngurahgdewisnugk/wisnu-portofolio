@@ -6,7 +6,12 @@
 #
 #   release: build -> Trivy scan -> push to GHCR (deployed by immutable digest)
 #   deploy:  OIDC to AWS -> open SSH for this runner only -> deploy with
-#            automatic rollback -> public smoke test -> close SSH again
+#            automatic rollback -> monitoring stack + target check ->
+#            public smoke test -> close SSH again
+#
+# Environment `production` needs, besides the AWS/SSH values:
+#   secret   GRAFANA_ADMIN_PASSWORD  (16+ letters/digits, e.g. openssl rand -hex 16)
+#   variable WEB_REPLICAS            (optional, 1-3, default 2) = manual scaling
 #
 # All third-party actions are pinned to full commit SHAs (see ci.yml).
 
@@ -180,18 +185,38 @@ jobs:
 
       - name: Upload deployment files
         run: |
-          ssh portfolio 'mkdir -p /opt/portfolio/nginx /opt/portfolio/scripts'
+          ssh portfolio 'mkdir -p /opt/portfolio/nginx /opt/portfolio/scripts /opt/portfolio/monitoring'
           scp -q deploy/docker-compose.yml portfolio:/opt/portfolio/docker-compose.yml
           scp -q deploy/nginx/nginx.conf portfolio:/opt/portfolio/nginx/nginx.conf
           scp -q deploy/scripts/deploy.sh portfolio:/opt/portfolio/scripts/deploy.sh
+          # Files are overwritten in place, so running containers keep seeing
+          # them through their bind mounts; deploy.sh then reloads the configs.
+          scp -rq deploy/monitoring portfolio:/opt/portfolio/
 
       # Secrets travel over stdin only, never as command-line arguments.
-      - name: Write runtime configuration (.env)
+      # .env is read by the web replicas and by Compose (WEB_REPLICAS);
+      # grafana.env only by Grafana, so the app never sees the Grafana password.
+      - name: Write runtime configuration (.env, grafana.env)
         env:
           GH_API_TOKEN: ${{ secrets.GH_API_TOKEN }}
+          GRAFANA_ADMIN_PASSWORD: ${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+          WEB_REPLICAS: ${{ vars.WEB_REPLICAS || '2' }}
         run: |
-          printf 'GITHUB_USERNAME=%s\nGITHUB_TOKEN=%s\n' "$GITHUB_REPOSITORY_OWNER" "$GH_API_TOKEN" \
+          if ! [[ "$WEB_REPLICAS" =~ ^[1-3]$ ]]; then
+            echo "::error::WEB_REPLICAS must be 1, 2 or 3 (got '${WEB_REPLICAS}'); 3 is the memory ceiling of a t3.small"
+            exit 1
+          fi
+          if ! [[ "$GRAFANA_ADMIN_PASSWORD" =~ ^[A-Za-z0-9]{16,}$ ]]; then
+            echo "::error::Secret GRAFANA_ADMIN_PASSWORD is missing or not 16+ letters/digits (openssl rand -hex 16)"
+            exit 1
+          fi
+          printf 'GITHUB_USERNAME=%s\nGITHUB_TOKEN=%s\nWEB_REPLICAS=%s\n' \
+              "$GITHUB_REPOSITORY_OWNER" "$GH_API_TOKEN" "$WEB_REPLICAS" \
             | ssh portfolio 'umask 077 && cat > /opt/portfolio/.env'
+          printf 'GF_SECURITY_ADMIN_PASSWORD=%s\n' "$GRAFANA_ADMIN_PASSWORD" \
+            | ssh portfolio 'umask 077 && cat > /opt/portfolio/grafana.env'
+          echo "Scaling: ${WEB_REPLICAS} web replica(s)"
+          echo "WEB_REPLICAS=${WEB_REPLICAS}" >> "$GITHUB_ENV"
 
       - name: Deploy with automatic rollback
         env:
@@ -229,6 +254,14 @@ jobs:
             exit 1
           fi
 
+          # Prometheus and Grafana must only be reachable through an SSH tunnel.
+          for port in 9090 3001; do
+            if curl -s -o /dev/null --connect-timeout 5 "http://${EC2_HOST}:${port}/"; then
+              echo "::error::Port ${port} answers from the internet"
+              exit 1
+            fi
+          done
+
           {
             echo "### Deployed to production"
             echo ""
@@ -239,6 +272,8 @@ jobs:
             echo "| Image | \`${IMAGE}\` |"
             echo "| /health | 200 |"
             echo "| /api/metrics from internet | 404 (blocked) |"
+            echo "| Web replicas | ${WEB_REPLICAS} |"
+            echo "| Prometheus :9090 / Grafana :3001 from internet | closed (SSH tunnel only) |"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Close SSH for this runner

@@ -8,6 +8,9 @@
 # 2. Pull and start the new image; wait until every container is healthy.
 # 3. Verify /version through Nginx reports the expected commit.
 # 4. On any failure, start the previously deployed image again and exit 1.
+# 5. Start/refresh the monitoring stack and check every Prometheus target is up.
+#    A monitoring failure exits 2 WITHOUT rolling back: the app is healthy, but
+#    the pipeline still goes red so the problem gets noticed.
 
 set -Eeuo pipefail
 
@@ -22,6 +25,11 @@ readonly CURRENT_FILE="${STATE_DIR}/current_image"
 readonly HISTORY_FILE="${STATE_DIR}/history.log"
 readonly BASE_URL="${DEPLOY_CHECK_URL:-http://127.0.0.1}"
 readonly WAIT_TIMEOUT="${DEPLOY_WAIT_TIMEOUT:-180}"
+readonly PROMETHEUS_URL="http://127.0.0.1:9090"
+readonly GRAFANA_URL="http://127.0.0.1:3001"
+
+readonly APP_SERVICES=(web nginx)
+readonly MONITORING_SERVICES=(prometheus grafana node-exporter blackbox-exporter nginx-exporter)
 
 log() { printf '%s [deploy] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 
@@ -49,9 +57,60 @@ verify_release() {
   return 1
 }
 
+# NOTE: start/start_monitoring run inside `if`, where `set -e` is disabled,
+# so every step returns explicitly on failure.
 start() {
-  compose "$1" pull --quiet web
-  compose "$1" up -d --remove-orphans --wait --wait-timeout "${WAIT_TIMEOUT}"
+  compose "$1" pull --quiet web || return 1
+  compose "$1" up -d --remove-orphans --wait --wait-timeout "${WAIT_TIMEOUT}" "${APP_SERVICES[@]}" || return 1
+  # A changed nginx.conf does not recreate the container; validate, then reload.
+  compose "$1" exec -T nginx nginx -t -q || return 1
+  compose "$1" exec -T nginx nginx -s reload || return 1
+}
+
+# Poll a URL until it answers 2xx, up to $2 seconds.
+wait_for() {
+  local url="$1" timeout="$2" waited=0
+  until curl -fsS --max-time 3 -o /dev/null "${url}"; do
+    waited=$((waited + 3))
+    if [[ ${waited} -ge ${timeout} ]]; then
+      log "${url} not ready after ${timeout}s"
+      return 1
+    fi
+    sleep 3
+  done
+}
+
+# Every active Prometheus target must be up, and Prometheus must see one
+# portfolio-web target per running web container (Docker DNS discovery).
+verify_targets() {
+  local want json='{"data":{"activeTargets":[]}}' total=0 down=0 web=0
+  want="$(compose "${NEW_IMAGE}" ps -q web | wc -l)"
+  for _ in $(seq 1 30); do
+    json="$(curl -fsS --max-time 3 "${PROMETHEUS_URL}/api/v1/targets?state=active")" \
+      || json='{"data":{"activeTargets":[]}}'
+    total="$(jq '.data.activeTargets | length' <<<"${json}")"
+    down="$(jq '[.data.activeTargets[] | select(.health != "up")] | length' <<<"${json}")"
+    web="$(jq '[.data.activeTargets[] | select(.labels.job == "portfolio-web" and .health == "up")] | length' <<<"${json}")"
+    if [[ ${total} -gt 0 && ${down} -eq 0 && ${web} -eq ${want} ]]; then
+      log "monitoring: ${total} targets up, ${web}/${want} web replicas scraped"
+      jq -r '.data.activeTargets[] | "  \(.labels.job)\t\(.labels.instance)\t\(.health)"' <<<"${json}"
+      return 0
+    fi
+    sleep 3
+  done
+  log "monitoring: ${down} of ${total} targets not up, ${web}/${want} web replicas scraped"
+  jq -r '.data.activeTargets[] | "  \(.labels.job)\t\(.labels.instance)\t\(.health)\t\(.lastError)"' <<<"${json}"
+  return 1
+}
+
+start_monitoring() {
+  compose "${NEW_IMAGE}" up -d --wait --wait-timeout "${WAIT_TIMEOUT}" "${MONITORING_SERVICES[@]}" || return 1
+  # Bind-mounted config changes do not restart containers: validate, then reload.
+  compose "${NEW_IMAGE}" exec -T prometheus promtool check config /etc/prometheus/prometheus.yml >/dev/null || return 1
+  compose "${NEW_IMAGE}" kill -s SIGHUP prometheus blackbox-exporter >/dev/null || return 1
+  wait_for "${PROMETHEUS_URL}/-/ready" 60 || return 1
+  wait_for "${GRAFANA_URL}/api/health" 180 || return 1
+  verify_targets
 }
 
 rollback() {
@@ -85,10 +144,19 @@ if start "${NEW_IMAGE}" && verify_release; then
   printf '%s deploy %s %s\n' "$(date -u +%FT%TZ)" "${EXPECTED_SHA}" "${NEW_IMAGE}" >> "${HISTORY_FILE}"
   docker image prune --force >/dev/null
   log "SUCCESS: ${EXPECTED_SHA} is live"
-  compose "${NEW_IMAGE}" ps
 else
   log "FAILED: new release did not become healthy"
   compose "${NEW_IMAGE}" logs --tail 50 web || log "could not read logs"
   rollback
   exit 1
+fi
+
+log "starting monitoring stack"
+if start_monitoring; then
+  log "monitoring OK"
+  compose "${NEW_IMAGE}" ps
+else
+  log "MONITORING FAILED (app stays on ${EXPECTED_SHA}, no rollback)"
+  compose "${NEW_IMAGE}" logs --tail 30 "${MONITORING_SERVICES[@]}" || log "could not read logs"
+  exit 2
 fi
