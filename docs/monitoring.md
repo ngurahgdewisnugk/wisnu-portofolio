@@ -170,19 +170,20 @@ sudo APP_IMAGE="$(cat .deploy/current_image)" docker compose up -d --scale web=3
 
 ### Why the ceiling is 3
 
-Memory on the t3.small (2 GiB RAM + 2 GiB swap), measured in production with 2 replicas:
+Memory on the t3.small (2 GiB RAM + 2 GiB swap), measured in production:
 
 | Service | Limit | Measured working set |
 | --- | --- | --- |
 | web, per replica | 384 MiB | ~50–100 MiB (grows after start, see the dashboard) |
 | Nginx | 64 MiB | ~6 MiB |
 | Prometheus | 256 MiB | ~162 MiB (cgroup `max` events: 0) |
-| Grafana | 768 MiB | ~450 MiB (~280 MiB process + ~160 MiB actively used files) |
+| Grafana | 768 MiB | ~313 MiB (~219 MiB process + ~94 MiB actively used files) after ~12 hours at 768 MiB, cgroup `max` events: 0. At 512 MiB it had grown to ~450 MiB and kept hitting the limit |
 | 3 exporters | 3 × 48 MiB | ~54 MiB together |
 | **Total, 2 replicas / 3 replicas** | **2000 MiB / 2384 MiB** | **~865 MiB / ~965 MiB** |
 
 With 2 replicas the host reported ~886 MiB available and ~56 MiB of swap in use, so a
-third replica (~+100 MiB) fits. Limits are ceilings, not usage: their sum exceeds RAM
+third replica (~+100 MiB) fits. Confirmed after scaling to 3 (30 Sep 2026): 841 MiB
+available, 30 MiB of swap in use, each web replica ~96 MiB. Limits are ceilings, not usage: their sum exceeds RAM
 because the containers never peak together, and swap absorbs short bursts. The cap of 3
 keeps that bet safe; the dashboard's memory panels show the real numbers.
 
@@ -206,7 +207,7 @@ monitoring off the app host.
 
 | Gate | How to show it |
 | --- | --- |
-| CI blocks a bad change | Open a throwaway PR that breaks a unit test (or an alert rule). CI goes red and the `protect-main` ruleset disables the merge button. Close the PR without merging and delete the branch. |
+| CI blocks a bad change | Open a throwaway PR that breaks a unit test (or an alert rule). CI goes red and the `protect-main` ruleset disables the merge button. Close the PR without merging and delete the branch. Done in [PR #7](https://github.com/ngurahgdewisnugk/wisnu-portofolio/pull/7): `expected 200 to be 201`, Docker job skipped, "Merging is blocked due to failing merge requirements". |
 | CD only ships what CI passed | CD triggers on `workflow_run` with `conclusion == 'success'`; a red CI run never starts CD. |
 | Deploy rolls back an unhealthy release | `deploy.sh` restarts the previous image digest if a container is unhealthy or `/version` does not match the commit. |
 | Monitoring is verified on every deploy | `deploy.sh` fails the job (without rolling back the healthy app) if any Prometheus target is down or a web replica is not scraped. |

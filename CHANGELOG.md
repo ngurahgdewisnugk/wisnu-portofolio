@@ -6,6 +6,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- README completed for submission: project checklist, architecture diagram, dashboard
+  screenshot, merge-gate proof (PR #7), measured production numbers with 3 replicas,
+  troubleshooting table (8 real issues), cost and teardown.
+- `docs/monitoring.md`: Grafana working set measured after the 768 MiB fix, and the
+  3-replica host measurement. `docs/deployment.md`: two more troubleshooting rows.
+
 ## [0.3.2] - 2026-09-30
 
 ### Fixed
