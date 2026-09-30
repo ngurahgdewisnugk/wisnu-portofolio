@@ -9,7 +9,7 @@ describe("GET /api/health", () => {
     const { req, res, result } = createMocks("GET");
     handler(req, res);
 
-    expect(result.statusCode).toBe(200);
+    expect(result.statusCode).toBe(201);
     const body = result.body as HealthResponse;
     expect(body.status).toBe("ok");
     expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
